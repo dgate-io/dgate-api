@@ -15,8 +15,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"github.com/dop251/goja"
 	"github.com/google/uuid"
 )

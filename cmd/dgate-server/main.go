@@ -9,10 +9,10 @@ import (
 
 	"runtime/debug"
 
-	"github.com/dgate-io/dgate/internal/admin"
-	"github.com/dgate-io/dgate/internal/config"
-	"github.com/dgate-io/dgate/internal/proxy"
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/internal/admin"
+	"github.com/dgate-io/dgate-api/internal/config"
+	"github.com/dgate-io/dgate-api/internal/proxy"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"github.com/spf13/pflag"
 )
 

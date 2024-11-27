@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"go.uber.org/zap"
 )
 

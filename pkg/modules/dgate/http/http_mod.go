@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules"
 	"github.com/dop251/goja"
 )
 

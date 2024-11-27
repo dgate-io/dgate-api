@@ -3,9 +3,9 @@ package proxystore_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/internal/proxy/proxystore"
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/storage"
+	"github.com/dgate-io/dgate-api/internal/proxy/proxystore"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )

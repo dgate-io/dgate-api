@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/dop251/goja"
 )
 

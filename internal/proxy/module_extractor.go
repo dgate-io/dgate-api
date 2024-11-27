@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/modules/extractors"
-	"github.com/dgate-io/dgate/pkg/modules/types"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules/extractors"
+	"github.com/dgate-io/dgate-api/pkg/modules/types"
 )
 
 type ModuleExtractor interface {

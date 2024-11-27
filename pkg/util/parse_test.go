@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
 

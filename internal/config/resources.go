@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 func (resources *DGateResources) Validate() (int, error) {

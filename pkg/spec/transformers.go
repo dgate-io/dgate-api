@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 
-	"github.com/dgate-io/dgate/pkg/util/sliceutil"
+	"github.com/dgate-io/dgate-api/pkg/util/sliceutil"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 

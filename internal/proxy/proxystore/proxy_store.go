@@ -6,8 +6,8 @@ import (
 
 	"errors"
 
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/storage"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/storage"
 	"github.com/dgraph-io/badger/v4"
 	"go.uber.org/zap"
 )

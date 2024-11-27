@@ -32,9 +32,9 @@ jobs:
     
       - name: Install dgate-cli and dgate-server
         run: |
-          go install github.com/dgate-io/dgate/cmd/dgate-cli
+          go install github.com/dgate-io/dgate-api/cmd/dgate-cli
           dgate-cli --version
-          go install github.com/dgate-io/dgate/cmd/dgate-server
+          go install github.com/dgate-io/dgate-api/cmd/dgate-server
           dgate-server --version
     
       - name: Install jq

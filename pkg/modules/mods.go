@@ -3,11 +3,11 @@ package modules
 import (
 	"context"
 
-	"github.com/dgate-io/dgate/pkg/cache"
-	"github.com/dgate-io/dgate/pkg/eventloop"
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/scheduler"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/cache"
+	"github.com/dgate-io/dgate-api/pkg/eventloop"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/scheduler"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/dop251/goja"
 )
 

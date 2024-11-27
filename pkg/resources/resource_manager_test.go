@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dgate-io/dgate/pkg/util/safe"
-	"github.com/dgate-io/dgate/pkg/util/tree/avl"
+	"github.com/dgate-io/dgate-api/pkg/util/safe"
+	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 )
 
 type kv[T, U any] struct {

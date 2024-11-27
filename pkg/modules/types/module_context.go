@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/eventloop"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/eventloop"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 type ModuleContext struct {

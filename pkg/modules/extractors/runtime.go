@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/modules/dgate"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/buffer"
 	"github.com/dop251/goja_nodejs/console"

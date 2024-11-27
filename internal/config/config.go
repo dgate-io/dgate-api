@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

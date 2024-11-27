@@ -1,7 +1,7 @@
 package resources
 
 import (
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 type DocumentManager interface {

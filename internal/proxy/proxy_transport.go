@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/dgate-io/dgate/internal/config"
+	"github.com/dgate-io/dgate-api/internal/config"
 	"golang.org/x/net/http2"
 )
 

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"go.uber.org/zap"
 )
 

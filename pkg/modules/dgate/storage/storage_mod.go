@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 type StorageModule struct {

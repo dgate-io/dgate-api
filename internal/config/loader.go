@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"github.com/hashicorp/raft"
 	kjson "github.com/knadh/koanf/parsers/json"
 	ktoml "github.com/knadh/koanf/parsers/toml"

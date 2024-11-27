@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/eventloop"
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/typescript"
+	"github.com/dgate-io/dgate-api/pkg/eventloop"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/typescript"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
 )

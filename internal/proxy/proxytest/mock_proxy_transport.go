@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgate-io/dgate/internal/proxy/proxy_transport"
+	"github.com/dgate-io/dgate-api/internal/proxy/proxy_transport"
 	"github.com/stretchr/testify/mock"
 )
 

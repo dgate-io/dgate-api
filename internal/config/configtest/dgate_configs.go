@@ -1,8 +1,8 @@
 package configtest
 
 import (
-	"github.com/dgate-io/dgate/internal/config"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/config"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"go.uber.org/zap"
 )
 

@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/iplist"
+	"github.com/dgate-io/dgate-api/pkg/util/iplist"
 	"github.com/stretchr/testify/assert"
 )
 

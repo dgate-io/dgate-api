@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgate-io/dgate/internal/config"
+	"github.com/dgate-io/dgate-api/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

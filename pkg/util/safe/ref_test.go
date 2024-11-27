@@ -3,7 +3,7 @@ package safe_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/safe"
+	"github.com/dgate-io/dgate-api/pkg/util/safe"
 )
 
 type test struct {

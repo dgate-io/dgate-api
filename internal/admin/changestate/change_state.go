@@ -1,10 +1,10 @@
 package changestate
 
 import (
-	"github.com/dgate-io/dgate/internal/proxy"
-	"github.com/dgate-io/dgate/pkg/raftadmin"
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/proxy"
+	"github.com/dgate-io/dgate-api/pkg/raftadmin"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/hashicorp/raft"
 )
 

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dgate-io/dgate/internal/config"
+	"github.com/dgate-io/dgate-api/internal/config"
 	ms "github.com/mitchellh/mapstructure"
 )
 

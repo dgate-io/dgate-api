@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/dgate-io/chi-router"
-	"github.com/dgate-io/dgate/internal/admin/changestate"
-	"github.com/dgate-io/dgate/internal/config"
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/internal/admin/changestate"
+	"github.com/dgate-io/dgate-api/internal/config"
+	"github.com/dgate-io/dgate-api/pkg/util"
 )
 
 func ConfigureChangeLogAPI(server chi.Router, cs changestate.ChangeState, appConfig *config.DGateConfig) {

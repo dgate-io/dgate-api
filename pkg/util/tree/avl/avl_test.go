@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/tree/avl"
+	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 )
 
 // Test AVL Tree Insertion

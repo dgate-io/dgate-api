@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/rafthttp"
-	"github.com/dgate-io/dgate/pkg/util/logadapter"
+	"github.com/dgate-io/dgate-api/pkg/rafthttp"
+	"github.com/dgate-io/dgate-api/pkg/util/logadapter"
 	"github.com/hashicorp/raft"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"

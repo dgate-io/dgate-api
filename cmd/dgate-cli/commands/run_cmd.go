@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/dgate-io/dgate/pkg/dgclient"
+	"github.com/dgate-io/dgate-api/pkg/dgclient"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/term"
 )

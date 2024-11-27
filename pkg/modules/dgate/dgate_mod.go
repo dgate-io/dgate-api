@@ -4,13 +4,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/crypto"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/exp"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/http"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/state"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/storage"
-	"github.com/dgate-io/dgate/pkg/modules/dgate/util"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/crypto"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/exp"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/http"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/state"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/storage"
+	"github.com/dgate-io/dgate-api/pkg/modules/dgate/util"
 	"github.com/dop251/goja"
 )
 

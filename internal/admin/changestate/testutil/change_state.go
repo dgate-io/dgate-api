@@ -4,10 +4,10 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/dgate-io/dgate/internal/admin/changestate"
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/raftadmin"
+	"github.com/dgate-io/dgate-api/internal/admin/changestate"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/raftadmin"
 	"github.com/hashicorp/raft"
 	"github.com/stretchr/testify/mock"
 )

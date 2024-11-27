@@ -31,7 +31,7 @@ jobs:
       uses: codecov/codecov-action@v4.0.1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        slug: dgate-io/dgate
+        slug: dgate-io/dgate-api
 
     - name: Benchmark
       run: |

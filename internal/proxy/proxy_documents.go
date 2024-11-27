@@ -1,8 +1,8 @@
 package proxy
 
 import (
-	"github.com/dgate-io/dgate/pkg/resources"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/resources"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 // DocumentManager is an interface that defines the methods for managing documents.

@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"github.com/dgate-io/dgate/pkg/dgclient"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/dgclient"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/urfave/cli/v2"
 )
 

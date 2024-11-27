@@ -3,7 +3,7 @@ package util_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util"
 )
 
 func TestDefault(t *testing.T) {

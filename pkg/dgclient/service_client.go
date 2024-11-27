@@ -3,7 +3,7 @@ package dgclient
 import (
 	"net/url"
 
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 type DGateServiceClient interface {

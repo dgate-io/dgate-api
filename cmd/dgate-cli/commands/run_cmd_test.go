@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/dgclient"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/dgclient"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/dgate-io/chi-router"
-	"github.com/dgate-io/dgate/internal/proxy/reverse_proxy"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/proxy/reverse_proxy"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 )
 
 type S string

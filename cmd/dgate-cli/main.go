@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/dgate-io/dgate/cmd/dgate-cli/commands"
-	"github.com/dgate-io/dgate/pkg/dgclient"
+	"github.com/dgate-io/dgate-api/cmd/dgate-cli/commands"
+	"github.com/dgate-io/dgate-api/pkg/dgclient"
 )
 
 var version string = "dev"

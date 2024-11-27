@@ -3,7 +3,7 @@ package queue_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/queue"
+	"github.com/dgate-io/dgate-api/pkg/util/queue"
 	"github.com/stretchr/testify/assert"
 )
 

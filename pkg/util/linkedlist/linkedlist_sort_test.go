@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/linkedlist"
+	"github.com/dgate-io/dgate-api/pkg/util/linkedlist"
 )
 
 func TestMergeSortLinkedListRecursive(t *testing.T) {

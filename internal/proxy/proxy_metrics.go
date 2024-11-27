@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dgate-io/dgate/internal/config"
+	"github.com/dgate-io/dgate-api/internal/config"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	api "go.opentelemetry.io/otel/metric"

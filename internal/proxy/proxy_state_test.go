@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dgate-io/dgate/internal/config/configtest"
-	"github.com/dgate-io/dgate/internal/proxy"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/config/configtest"
+	"github.com/dgate-io/dgate-api/internal/proxy"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

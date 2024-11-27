@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/dgate-io/chi-router"
-	"github.com/dgate-io/dgate/internal/admin/changestate/testutil"
-	"github.com/dgate-io/dgate/internal/config/configtest"
-	"github.com/dgate-io/dgate/pkg/resources"
+	"github.com/dgate-io/dgate-api/internal/admin/changestate/testutil"
+	"github.com/dgate-io/dgate-api/internal/config/configtest"
+	"github.com/dgate-io/dgate-api/pkg/resources"
 	"go.uber.org/zap"
 )
 

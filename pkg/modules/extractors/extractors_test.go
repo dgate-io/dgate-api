@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/modules/extractors"
-	"github.com/dgate-io/dgate/pkg/modules/testutil"
-	"github.com/dgate-io/dgate/pkg/typescript"
+	"github.com/dgate-io/dgate-api/pkg/modules/extractors"
+	"github.com/dgate-io/dgate-api/pkg/modules/testutil"
+	"github.com/dgate-io/dgate-api/pkg/typescript"
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 )

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/eventloop"
-	"github.com/dgate-io/dgate/pkg/modules/types"
+	"github.com/dgate-io/dgate-api/pkg/eventloop"
+	"github.com/dgate-io/dgate-api/pkg/modules/types"
 	"github.com/dop251/goja"
 )
 

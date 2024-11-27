@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgate-io/dgate/internal/proxy/proxytest"
-	"github.com/dgate-io/dgate/internal/proxy/reverse_proxy"
+	"github.com/dgate-io/dgate-api/internal/proxy/proxytest"
+	"github.com/dgate-io/dgate-api/internal/proxy/reverse_proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

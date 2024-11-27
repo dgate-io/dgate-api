@@ -1,4 +1,4 @@
-module github.com/dgate-io/dgate
+module github.com/dgate-io/dgate-api
 
 go 1.22.0
 

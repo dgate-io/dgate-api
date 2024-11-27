@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dgate-io/dgate/internal/proxy/reverse_proxy"
+	"github.com/dgate-io/dgate-api/internal/proxy/reverse_proxy"
 	"github.com/stretchr/testify/mock"
 )
 

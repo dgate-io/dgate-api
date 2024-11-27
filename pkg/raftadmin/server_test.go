@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/util/logadapter"
+	"github.com/dgate-io/dgate-api/pkg/util/logadapter"
 	"github.com/hashicorp/raft"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

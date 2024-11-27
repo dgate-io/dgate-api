@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/typescript"
+	"github.com/dgate-io/dgate-api/pkg/typescript"
 	"github.com/dop251/goja"
 )
 

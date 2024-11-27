@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/dgclient"
+	"github.com/dgate-io/dgate-api/pkg/dgclient"
 	"github.com/stretchr/testify/assert"
 )
 

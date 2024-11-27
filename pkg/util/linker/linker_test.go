@@ -3,7 +3,7 @@ package linker_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/linker"
+	"github.com/dgate-io/dgate-api/pkg/util/linker"
 	"github.com/stretchr/testify/assert"
 )
 

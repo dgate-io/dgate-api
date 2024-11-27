@@ -4,11 +4,11 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/util/keylock"
-	"github.com/dgate-io/dgate/pkg/util/linker"
-	"github.com/dgate-io/dgate/pkg/util/safe"
-	"github.com/dgate-io/dgate/pkg/util/tree/avl"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/util/keylock"
+	"github.com/dgate-io/dgate-api/pkg/util/linker"
+	"github.com/dgate-io/dgate-api/pkg/util/safe"
+	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 )
 
 type avlTreeLinker[T any] avl.Tree[string, *linker.Link[string, safe.Ref[T]]]

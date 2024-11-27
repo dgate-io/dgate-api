@@ -3,7 +3,7 @@ package sliceutil_test
 import (
 	"testing"
 
-	"github.com/dgate-io/dgate/pkg/util/sliceutil"
+	"github.com/dgate-io/dgate-api/pkg/util/sliceutil"
 )
 
 func TestBinarySearch(t *testing.T) {

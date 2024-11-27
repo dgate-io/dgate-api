@@ -3,11 +3,11 @@ package proxy_test
 import (
 	"net/http"
 
-	"github.com/dgate-io/dgate/internal/proxy"
-	"github.com/dgate-io/dgate/pkg/modules"
-	"github.com/dgate-io/dgate/pkg/modules/extractors"
-	"github.com/dgate-io/dgate/pkg/modules/types"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/proxy"
+	"github.com/dgate-io/dgate-api/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules/extractors"
+	"github.com/dgate-io/dgate-api/pkg/modules/types"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/stretchr/testify/mock"
 )
 

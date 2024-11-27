@@ -1,7 +1,7 @@
 package exp
 
 import (
-	"github.com/dgate-io/dgate/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules"
 )
 
 type ExperimentalModule struct {

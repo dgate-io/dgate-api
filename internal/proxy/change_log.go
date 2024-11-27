@@ -6,8 +6,8 @@ import (
 
 	"errors"
 
-	"github.com/dgate-io/dgate/pkg/spec"
-	"github.com/dgate-io/dgate/pkg/util/sliceutil"
+	"github.com/dgate-io/dgate-api/pkg/spec"
+	"github.com/dgate-io/dgate-api/pkg/util/sliceutil"
 	"github.com/hashicorp/raft"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"

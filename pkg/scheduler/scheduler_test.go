@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/scheduler"
+	"github.com/dgate-io/dgate-api/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 )
 

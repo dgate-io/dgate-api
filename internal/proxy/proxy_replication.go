@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"github.com/dgate-io/dgate/pkg/raftadmin"
+	"github.com/dgate-io/dgate-api/pkg/raftadmin"
 	"github.com/hashicorp/raft"
 )
 

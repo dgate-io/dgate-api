@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dgate-io/dgate/pkg/modules"
+	"github.com/dgate-io/dgate-api/pkg/modules"
 )
 
 type UtilModule struct {

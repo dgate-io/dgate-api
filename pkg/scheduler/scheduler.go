@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgate-io/dgate/pkg/util/heap"
+	"github.com/dgate-io/dgate-api/pkg/util/heap"
 	"go.uber.org/zap"
 )
 

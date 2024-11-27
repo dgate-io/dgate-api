@@ -10,9 +10,9 @@ import (
 
 	"github.com/dgate-io/chi-router"
 	"github.com/dgate-io/chi-router/middleware"
-	"github.com/dgate-io/dgate/internal/admin/changestate"
-	"github.com/dgate-io/dgate/internal/config"
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/internal/admin/changestate"
+	"github.com/dgate-io/dgate-api/internal/config"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"go.uber.org/zap"
 
 	"golang.org/x/net/http2"

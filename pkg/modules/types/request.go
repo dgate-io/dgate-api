@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/dgate-io/dgate/pkg/eventloop"
-	"github.com/dgate-io/dgate/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/eventloop"
+	"github.com/dgate-io/dgate-api/pkg/util"
 	"github.com/dop251/goja"
 )
 

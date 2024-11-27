@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/dgate-io/dgate/internal/admin/changestate"
-	"github.com/dgate-io/dgate/pkg/spec"
+	"github.com/dgate-io/dgate-api/internal/admin/changestate"
+	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/hashicorp/raft"
 	"go.uber.org/zap"
 )

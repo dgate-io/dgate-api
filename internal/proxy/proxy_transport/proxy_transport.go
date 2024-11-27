@@ -7,7 +7,7 @@ import (
 
 	"errors"
 
-	"github.com/dgate-io/dgate/internal/proxy/proxyerrors"
+	"github.com/dgate-io/dgate-api/internal/proxy/proxyerrors"
 )
 
 type Builder interface {
