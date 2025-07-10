@@ -376,7 +376,7 @@ func (ps *ProxyState) restoreFromChangeLogs(directApply bool) error {
 	}
 
 	// DISABLED: compaction of change logs needs to have better testing
-	if len(logs) < 0 {
+	if false {
 		removed, err := ps.compactChangeLogs(logs)
 		if err != nil {
 			ps.logger.Error("failed to compact state change logs", zap.Error(err))

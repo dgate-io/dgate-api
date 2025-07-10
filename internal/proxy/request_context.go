@@ -97,7 +97,7 @@ func (reqCtxProvider *RequestContextProvider) ModulePool() ModulePool {
 }
 
 func (reqCtxProvider *RequestContextProvider) CreateRequestContext(
-	ctx context.Context, rw http.ResponseWriter,
+	rw http.ResponseWriter,
 	req *http.Request, pattern string,
 ) *RequestContext {
 	pathParams := make(map[string]string)
@@ -107,12 +107,12 @@ func (reqCtxProvider *RequestContextProvider) CreateRequestContext(
 		}
 	}
 	return &RequestContext{
-		ctx:      ctx,
+		ctx:      reqCtxProvider.ctx,
 		pattern:  pattern,
 		params:   pathParams,
 		provider: reqCtxProvider,
 		route:    reqCtxProvider.route,
-		req:      req.WithContext(ctx),
+		req:      req.WithContext(reqCtxProvider.ctx),
 		rw:       spec.NewResponseWriterTracker(rw),
 	}
 }

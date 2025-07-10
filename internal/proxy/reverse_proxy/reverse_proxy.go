@@ -152,22 +152,13 @@ func (b *reverseProxyBuilder) rewriteStripPath(strip bool) RewriteFunc {
 
 func (b *reverseProxyBuilder) rewritePreserveHost(preserve bool) RewriteFunc {
 	return func(in, out *http.Request) {
-		scheme := "http"
-		out.URL.Host = b.upstreamUrl.Host
 		if preserve {
 			out.Host = in.Host
-			if out.Host == "" {
-				out.Host = out.URL.Host
+			inHost := in.Header.Get("Host")
+			if inHost == "" {
+				inHost = in.Host
 			}
-			if in.TLS != nil {
-				scheme = "https"
-			}
-		} else {
-			out.Host = out.URL.Host
-			scheme = b.upstreamUrl.Scheme
-		}
-		if out.URL.Scheme == "" {
-			out.URL.Scheme = scheme
+			out.Header.Set("Host", inHost)
 		}
 	}
 }

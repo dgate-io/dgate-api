@@ -21,7 +21,12 @@ http://dgate.io/docs/getting-started
 
 ```bash
 # requires go 1.22+
+
+# install dgate-server
 go install github.com/dgate-io/dgate-api/cmd/dgate-server@latest
+
+# install dgate-cli
+go install github.com/dgate-io/dgate-api/cmd/dgate-cli@latest
 ```
 
 ## Application Architecture
@@ -33,15 +38,3 @@ DGate Server is proxy and admin server bundled into one. the admin server is res
 ### DGate CLI (dgate-cli)
 
 DGate CLI is a command-line interface that can be used to interact with the DGate Server. It can be used to deploy modules, manage the state of the cluster, and more.
-
-#### Proxy Modules
-
-- Fetch Upstream Module (`fetchUpstream`) - executed before the request is sent to the upstream server. This module is used to decided which upstream server to send the current request to. (Essentially a custom load balancer module)
-
-- Request Modifier Module (`requestModifier`) - executed before the request is sent to the upstream server. This module is used to modify the request before it is sent to the upstream server.
-
-- Response Modifier Module (`responseModifier`) - executed after the response is received from the upstream server. This module is used to modify the response before it is sent to the client.
-
-- Error Handler Module (`errorHandler`) - executed when an error occurs when sending a request to the upstream server. This module is used to modify the response before it is sent to the client.
-
-- Request Handler Module (`requestHandler`) - executed when a request is received from the client. This module is used to handle arbitrary requests, instead of using an upstream service.

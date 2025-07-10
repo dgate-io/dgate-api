@@ -81,7 +81,7 @@ func proxyHandler(ps *ProxyState, reqCtx *RequestContext) {
 }
 
 func handleServiceProxy(ps *ProxyState, reqCtx *RequestContext, modExt ModuleExtractor) {
-	var host string
+	var upstreamUrlString string
 	if fetchUpstreamUrl, ok := modExt.FetchUpstreamUrlFunc(); ok {
 		fetchUpstreamStart := time.Now()
 		hostUrl, err := fetchUpstreamUrl(modExt.ModuleContext())
@@ -98,9 +98,9 @@ func handleServiceProxy(ps *ProxyState, reqCtx *RequestContext, modExt ModuleExt
 			util.WriteStatusCodeError(reqCtx.rw, http.StatusInternalServerError)
 			return
 		}
-		host = hostUrl.String()
+		upstreamUrlString = hostUrl.String()
 	} else {
-		if reqCtx.route.Service.URLs == nil || len(reqCtx.route.Service.URLs) == 0 {
+		if len(reqCtx.route.Service.URLs) == 0 {
 			ps.logger.Error("Error getting service urls",
 				zap.String("service", reqCtx.route.Service.Name),
 				zap.String("namespace", reqCtx.route.Namespace.Name),
@@ -108,7 +108,7 @@ func handleServiceProxy(ps *ProxyState, reqCtx *RequestContext, modExt ModuleExt
 			util.WriteStatusCodeError(reqCtx.rw, http.StatusInternalServerError)
 			return
 		}
-		host = reqCtx.route.Service.URLs[0].String()
+		upstreamUrlString = reqCtx.route.Service.URLs[0].String()
 	}
 
 	if reqCtx.route.Service.HideDGateHeaders {
@@ -122,10 +122,10 @@ func handleServiceProxy(ps *ProxyState, reqCtx *RequestContext, modExt ModuleExt
 
 		// downstream headers
 		if ps.debugMode {
-			reqCtx.rw.Header().Set("X-Upstream-URL", host)
+			reqCtx.rw.Header().Set("X-Upstream-URL", upstreamUrlString)
 		}
 	}
-	upstreamUrl, err := url.Parse(host)
+	upstreamUrl, err := url.Parse(upstreamUrlString)
 	if err != nil {
 		ps.logger.Error("Error parsing upstream url",
 			zap.String("error", err.Error()),

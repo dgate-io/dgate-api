@@ -7,12 +7,14 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dgate-io/dgate-api/internal/router"
 	"github.com/dgate-io/dgate-api/pkg/modules/extractors"
 	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/dgate-io/dgate-api/pkg/typescript"
+	"github.com/dgate-io/dgate-api/pkg/util/iplist"
 	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 	"github.com/dop251/goja"
 	"go.uber.org/zap"
@@ -391,11 +393,33 @@ func (ps *ProxyState) Stop() {
 	}
 }
 
-func (ps *ProxyState) HandleRoute(requestCtxProvider *RequestContextProvider, pattern string) http.HandlerFunc {
+func (ps *ProxyState) HandleRoute(ctxProvider *RequestContextProvider, pattern string) http.HandlerFunc {
+	ipList := iplist.NewIPList()
+	if len(ps.config.ProxyConfig.AllowList) > 0 {
+		for _, address := range ps.config.ProxyConfig.AllowList {
+			if strings.Contains(address, "/") {
+				if err := ipList.AddCIDRString(address); err != nil {
+					panic(fmt.Errorf("invalid cidr address in proxy.allow_list: %s", address))
+				}
+			} else {
+				if err := ipList.AddIPString(address); err != nil {
+					panic(fmt.Errorf("invalid ip address in proxy.allow_list: %s", address))
+				}
+			}
+		}
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		// ctx, cancel := context.WithCancel(requestCtxPrdovider.ctx)
-		// defer cancel()
-		ps.ProxyHandler(ps, requestCtxProvider.
-			CreateRequestContext(requestCtxProvider.ctx, w, r, pattern))
+		if ipList.Len() > 0 {
+			allowed, err := ipList.Contains(r.RemoteAddr)
+			if err != nil {
+				ps.logger.Error("Error checking ")
+			}
+			
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+			}
+		}
+		reqContext := ctxProvider.CreateRequestContext(w, r, pattern)
+		ps.ProxyHandler(ps, reqContext)
 	}
 }

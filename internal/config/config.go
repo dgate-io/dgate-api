@@ -46,6 +46,7 @@ type (
 		DisableXForwardedHeaders bool                     `koanf:"disable_x_forwarded_headers"`
 		StrictMode               bool                     `koanf:"strict_mode"`
 		XForwardedForDepth       int                      `koanf:"x_forwarded_for_depth"`
+		AllowList                []string                 `koanf:"allow_list"`
 
 		// WARN: debug use only
 		InitResources *DGateResources `koanf:"init_resources"`

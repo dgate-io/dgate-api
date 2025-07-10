@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/dgate-io/dgate-api/internal/config"
-	"github.com/dgate-io/dgate-api/internal/pattern"
 	"github.com/dgate-io/dgate-api/internal/proxy/proxy_transport"
 	"github.com/dgate-io/dgate-api/internal/proxy/proxystore"
 	"github.com/dgate-io/dgate-api/internal/proxy/reverse_proxy"
@@ -28,6 +27,7 @@ import (
 	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/dgate-io/dgate-api/pkg/storage"
 	"github.com/dgate-io/dgate-api/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util/pattern"
 	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -299,7 +299,7 @@ func (ps *ProxyState) ApplyChangeLog(log *spec.ChangeLog) error {
 		if err != nil {
 			return err
 		}
-		raftLog := raft.Log{ Data: encodedCL }
+		raftLog := raft.Log{Data: encodedCL}
 		now := time.Now()
 		future := r.ApplyLog(raftLog, time.Second*15)
 		err = future.Error()
@@ -448,7 +448,7 @@ func (ps *ProxyState) getDomainCertificate(
 				var err error
 				var cached bool
 				defer ps.metrics.MeasureCertResolutionDuration(
-					ctx, start, domain,cached, err,
+					ctx, start, domain, cached, err,
 				)
 				certBucket := ps.sharedCache.Bucket("certs")
 				key := fmt.Sprintf("cert:%s:%s:%d", d.Namespace.Name,

@@ -2,8 +2,10 @@ package iplist
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/dgate-io/dgate-api/pkg/util/linkedlist"
 )
@@ -18,6 +20,22 @@ func NewIPList() *IPList {
 		v4s: linkedlist.New[*net.IPNet](),
 		v6s: linkedlist.New[*net.IPNet](),
 	}
+}
+
+
+func (l *IPList) AddAll(list []string) error {
+	for _, ip := range list {
+		if strings.Contains(ip, "/") {
+			if err := l.AddCIDRString(ip); err != nil {
+				return errors.New(ip + ": " + err.Error())
+			}
+		} else {
+			if err := l.AddIPString(ip); err != nil {
+				return errors.New(ip + ": " + err.Error())
+			}
+		}
+	}
+	return nil
 }
 
 func (l *IPList) AddCIDRString(cidr string) error {
