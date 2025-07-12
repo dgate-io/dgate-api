@@ -3,3 +3,4 @@
 cov.out
 go.work.sum
 .env
+coverage.txt

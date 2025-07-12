@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dgate-io/dgate-api/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util/iplist"
 	"github.com/hashicorp/raft"
 	kjson "github.com/knadh/koanf/parsers/json"
 	ktoml "github.com/knadh/koanf/parsers/toml"
@@ -157,6 +158,15 @@ func LoadConfig(dgateConfigPath string) (*DGateConfig, error) {
 	kDefault(k, "proxy.enable_h2c", false)
 	kDefault(k, "proxy.enable_http2", false)
 	kDefault(k, "proxy.console_log_level", k.Get("log_level"))
+
+	if k.Exists("proxy.allow_list") {
+		var ips []string = k.Get("proxy.allow_list").([]string)
+		ipList := iplist.NewIPList()
+		err = ipList.AddAll(ips)
+		if err != nil {
+			return nil, errors.New("proxy.allow_list error: " + err.Error())
+		}
+	}
 
 	if k.Get("proxy.enable_h2c") == true &&
 		k.Get("proxy.enable_http2") == false {

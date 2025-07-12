@@ -1,6 +1,8 @@
 package keylock
 
-import "sync"
+import (
+	"sync"
+)
 
 type KeyLock struct {
 	locks   map[string]*sync.RWMutex

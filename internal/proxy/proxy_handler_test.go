@@ -1,7 +1,6 @@
 package proxy_test
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -57,8 +56,7 @@ func TestProxyHandler_ReverseProxy(t *testing.T) {
 		wr.SetWriteFallThrough()
 		wr.On("Header").Return(http.Header{})
 		wr.On("Write", mock.Anything).Return(0, nil).Maybe()
-		reqCtx := reqCtxProvider.CreateRequestContext(
-			context.Background(), wr, req, "/")
+		reqCtx := reqCtxProvider.CreateRequestContext(wr, req, "/")
 
 		modExt := NewMockModuleExtractor()
 		modExt.ConfigureDefaultMock(req, wr, ps, rt)
@@ -78,7 +76,7 @@ func TestProxyHandler_ReverseProxy(t *testing.T) {
 		modPool.AssertExpectations(t)
 		modExt.AssertExpectations(t)
 		rpBuilder.AssertExpectations(t)
-		// rpe.AssertExpectations(t)
+		rpe.AssertExpectations(t)
 	}
 }
 
@@ -129,8 +127,7 @@ func TestProxyHandler_ProxyHandler(t *testing.T) {
 		modPool.On("Return", modExt).Return().Once()
 		reqCtxProvider.UpdateModulePool(modPool)
 
-		reqCtx := reqCtxProvider.CreateRequestContext(
-			context.Background(), wr, req, "/")
+		reqCtx := reqCtxProvider.CreateRequestContext(wr, req, "/")
 		ps.ProxyHandler(ps, reqCtx)
 
 		wr.AssertExpectations(t)
@@ -181,8 +178,7 @@ func TestProxyHandler_ProxyHandlerError(t *testing.T) {
 		modPool.On("Return", modExt).Return().Once()
 		reqCtxProvider := proxy.NewRequestContextProvider(rt, ps)
 		reqCtxProvider.UpdateModulePool(modPool)
-		reqCtx := reqCtxProvider.CreateRequestContext(
-			context.Background(), wr, req, "/")
+		reqCtx := reqCtxProvider.CreateRequestContext(wr, req, "/")
 		ps.ProxyHandler(ps, reqCtx)
 
 		wr.AssertExpectations(t)

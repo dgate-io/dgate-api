@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/dgate-io/dgate-api/internal/config"
-	"github.com/dgate-io/dgate-api/internal/pattern"
 	"github.com/dgate-io/dgate-api/internal/proxy/proxy_transport"
 	"github.com/dgate-io/dgate-api/internal/proxy/proxystore"
 	"github.com/dgate-io/dgate-api/internal/proxy/reverse_proxy"
@@ -28,6 +27,7 @@ import (
 	"github.com/dgate-io/dgate-api/pkg/spec"
 	"github.com/dgate-io/dgate-api/pkg/storage"
 	"github.com/dgate-io/dgate-api/pkg/util"
+	"github.com/dgate-io/dgate-api/pkg/util/pattern"
 	"github.com/dgate-io/dgate-api/pkg/util/tree/avl"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -292,14 +292,22 @@ func (ps *ProxyState) ApplyChangeLog(log *spec.ChangeLog) error {
 		if r.State() != raft.Leader {
 			return raft.ErrNotLeader
 		}
-		if err := ps.processChangeLog(log, true, false); err != nil {
+		restartNeeded, err := ps.processChangeLog(log, true, false)
+		if err != nil {
 			return err
+		}
+		if restartNeeded {
+			go ps.restartState(func(err error) {
+				if err != nil {
+					ps.Stop()
+				}
+			})
 		}
 		encodedCL, err := json.Marshal(log)
 		if err != nil {
 			return err
 		}
-		raftLog := raft.Log{ Data: encodedCL }
+		raftLog := raft.Log{Data: encodedCL}
 		now := time.Now()
 		future := r.ApplyLog(raftLog, time.Second*15)
 		err = future.Error()
@@ -316,7 +324,15 @@ func (ps *ProxyState) ApplyChangeLog(log *spec.ChangeLog) error {
 		}
 		return err
 	} else {
-		return ps.processChangeLog(log, true, true)
+		restartNeeded, err := ps.processChangeLog(log, true, true)
+		if restartNeeded {
+			go ps.restartState(func(err error) {
+				if err != nil {
+					ps.Stop()
+				}
+			})
+		}
+		return err
 	}
 }
 
@@ -337,7 +353,6 @@ func (ps *ProxyState) SharedCache() cache.TCache {
 func (ps *ProxyState) restartState(fn func(error)) {
 	ps.logger.Info("Attempting to restart state...")
 	ps.proxyLock.Lock()
-	defer ps.proxyLock.Unlock()
 	ps.changeHash.Store(0)
 	ps.pendingChanges = false
 	ps.rm.Empty()
@@ -346,6 +361,8 @@ func (ps *ProxyState) restartState(fn func(error)) {
 	ps.routers.Clear()
 	ps.sharedCache.Clear()
 	ps.skdr.Stop()
+	ps.proxyLock.Unlock() // unlock before resource init and restore
+
 	if err := ps.initConfigResources(ps.config.ProxyConfig.InitResources); err != nil {
 		go fn(err)
 		return
@@ -371,15 +388,31 @@ func (ps *ProxyState) ReloadState(check bool, logs ...*spec.ChangeLog) error {
 		}
 	}
 	if reload {
-		return ps.processChangeLog(nil, true, false)
+		restartNeeded, err := ps.processChangeLog(nil, true, false)
+		if restartNeeded {
+			go ps.restartState(func(err error) {
+				if err != nil {
+					ps.Stop()
+				}
+			})
+		}
+		return err
 	}
 	return nil
 }
 
 func (ps *ProxyState) ProcessChangeLog(log *spec.ChangeLog, reload bool) error {
-	if err := ps.processChangeLog(log, reload, true); err != nil {
+	restartNeeded, err := ps.processChangeLog(log, reload, true)
+	if err != nil {
 		ps.logger.Error("processing error", zap.Error(err))
 		return err
+	}
+	if restartNeeded {
+		go ps.restartState(func(err error) {
+			if err != nil {
+				ps.Stop()
+			}
+		})
 	}
 	return nil
 }
@@ -448,7 +481,7 @@ func (ps *ProxyState) getDomainCertificate(
 				var err error
 				var cached bool
 				defer ps.metrics.MeasureCertResolutionDuration(
-					ctx, start, domain,cached, err,
+					ctx, start, domain, cached, err,
 				)
 				certBucket := ps.sharedCache.Bucket("certs")
 				key := fmt.Sprintf("cert:%s:%s:%d", d.Namespace.Name,
@@ -478,7 +511,15 @@ func (ps *ProxyState) getDomainCertificate(
 
 func (ps *ProxyState) initConfigResources(resources *config.DGateResources) error {
 	processCL := func(cl *spec.ChangeLog) error {
-		return ps.processChangeLog(cl, false, false)
+		restartNeeded, err := ps.processChangeLog(cl, false, false)
+		if restartNeeded {
+			go ps.restartState(func(err error) {
+				if err != nil {
+					ps.Stop()
+				}
+			})
+		}
+		return err
 	}
 	if resources != nil {
 		numChanges, err := resources.Validate()

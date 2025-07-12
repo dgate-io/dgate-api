@@ -14,7 +14,7 @@ import (
 )
 
 // processChangeLog - processes a change log and applies the change to the proxy state
-func (ps *ProxyState) processChangeLog(cl *spec.ChangeLog, reload, store bool) (err error) {
+func (ps *ProxyState) processChangeLog(cl *spec.ChangeLog, reload, store bool) (restartNeeded bool, err error) {
 	if reload {
 		defer func(start time.Time) {
 			if err != nil {
@@ -68,12 +68,6 @@ func (ps *ProxyState) processChangeLog(cl *spec.ChangeLog, reload, store bool) (
 				} else if !ps.changeHash.CompareAndSwap(oldHash, newHash) {
 					goto hash_retry
 				}
-			} else {
-				go ps.restartState(func(err error) {
-					if err != nil {
-						ps.Stop()
-					}
-				})
 			}
 		}()
 		if cl.Cmd.Resource() == spec.Documents {
@@ -99,16 +93,17 @@ func (ps *ProxyState) processChangeLog(cl *spec.ChangeLog, reload, store bool) (
 
 	// apply state changes to the proxy
 	if reload {
+		ps.logger.Debug("Reloading change log", zap.String("id", cl.ID))
 		overrideReload := cl.Cmd.IsNoop() || ps.pendingChanges
 		if overrideReload || cl.Cmd.Resource().IsRelatedTo(spec.Routes) {
 			if err := ps.storeCachedDocuments(); err != nil {
 				ps.logger.Error("error storing cached documents", zap.Error(err))
-				return err
+				return false, err
 			}
 			ps.logger.Debug("Reloading change log", zap.String("id", cl.ID))
 			if err = ps.reconfigureState(cl); err != nil {
 				ps.logger.Error("Error registering change log", zap.Error(err))
-				return
+				return false, err
 			}
 			ps.pendingChanges = false
 		}
@@ -116,7 +111,7 @@ func (ps *ProxyState) processChangeLog(cl *spec.ChangeLog, reload, store bool) (
 		ps.pendingChanges = true
 	}
 
-	return nil
+	return restartNeeded, nil
 }
 
 func decode[T any](input any) (T, error) {
@@ -353,7 +348,8 @@ func (ps *ProxyState) restoreFromChangeLogs(directApply bool) error {
 		if cl.Cmd.Resource() == spec.Documents {
 			continue
 		}
-		if err = ps.processChangeLog(cl, false, false); err != nil {
+		_, err = ps.processChangeLog(cl, false, false)
+		if err != nil {
 			ps.logger.Error("error processing change log",
 				zap.Bool("skip", ps.debugMode),
 				zap.Error(err),
@@ -371,12 +367,15 @@ func (ps *ProxyState) restoreFromChangeLogs(directApply bool) error {
 		if err = ps.reconfigureState(cl); err != nil {
 			return err
 		}
-	} else if err = ps.processChangeLog(cl, true, false); err != nil {
-		return err
+	} else {
+		_, err = ps.processChangeLog(cl, true, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	// DISABLED: compaction of change logs needs to have better testing
-	if len(logs) < 0 {
+	if false {
 		removed, err := ps.compactChangeLogs(logs)
 		if err != nil {
 			ps.logger.Error("failed to compact state change logs", zap.Error(err))
