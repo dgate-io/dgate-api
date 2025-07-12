@@ -17,10 +17,12 @@ import (
 
 type ProxyParams struct {
 	host    string
-	newHost string
+	expectedHost string
 
 	upstreamUrl   *url.URL
-	newUpsteamURL *url.URL
+	expectedUpsteamURL *url.URL
+	expectedScheme string
+	expectedPath   string
 
 	proxyPattern string
 	proxyPath    string
@@ -75,14 +77,21 @@ func testDGateProxyRewrite(
 
 	mockTp.On("RoundTrip", mock.Anything).Run(func(args mock.Arguments) {
 		req := args.Get(0).(*http.Request)
-		if req.URL.String() != params.newUpsteamURL.String() {
-			t.Errorf("FAIL: Expected URL %s, got %s", params.newUpsteamURL, req.URL)
+		if req.URL.String() != params.expectedUpsteamURL.String() {
+			t.Errorf("FAIL: Expected URL %s, got %s", params.expectedUpsteamURL, req.URL)
 		} else {
 			t.Logf("PASS: upstreamUrl: %s, proxyPattern: %s, proxyPath: %s, newUpsteamURL: %s",
-				params.upstreamUrl, params.proxyPattern, params.proxyPath, params.newUpsteamURL)
+				params.upstreamUrl, params.proxyPattern, params.proxyPath, params.expectedUpsteamURL)
 		}
-		if params.newHost != "" && req.Host != params.newHost {
-			t.Errorf("FAIL: Expected Host %s, got %s", params.newHost, req.Host)
+		if params.expectedHost != "" &&
+			(req.Host != params.expectedHost || req.Header.Get("Host") != params.expectedHost) {
+			t.Errorf("FAIL: Expected Host %s, got (%s | %s)", params.expectedHost, req.Host, req.Header.Get("Host"))
+		}
+		if params.expectedScheme != "" && req.URL.Scheme != params.expectedScheme {
+			t.Errorf("FAIL: Expected Scheme %s, got %s", params.expectedScheme, req.URL.Scheme)
+		}
+		if params.expectedPath != "" && req.URL.Path != params.expectedPath {
+			t.Errorf("FAIL: Expected Path %s, got %s", params.expectedPath, req.URL.Path)
 		}
 		if rewriteParams.xForwardedHeaders {
 			if req.Header.Get("X-Forwarded-For") == "" {
@@ -182,10 +191,10 @@ func TestDGateProxyRewriteStripPath(t *testing.T) {
 	// if proxy pattern is a prefix (ends with *)
 	testDGateProxyRewrite(t, ProxyParams{
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test/ing"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test/ing"),
 
 		proxyPattern: "/test/*",
 		proxyPath:    "/test/test/ing",
@@ -198,10 +207,10 @@ func TestDGateProxyRewriteStripPath(t *testing.T) {
 
 	testDGateProxyRewrite(t, ProxyParams{
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		upstreamUrl:   mustParseURL(t, "http://example.com/pre"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/pre"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/pre"),
 
 		proxyPattern: "/test/*",
 		proxyPath:    "/test/",
@@ -216,10 +225,10 @@ func TestDGateProxyRewriteStripPath(t *testing.T) {
 func TestDGateProxyRewritePreserveHost(t *testing.T) {
 	testDGateProxyRewrite(t, ProxyParams{
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test"),
 
 		host:    "test.net",
-		newHost: "test.net",
+		expectedHost: "test.net",
 
 		proxyPattern: "/test",
 		proxyPath:    "/test",
@@ -234,10 +243,10 @@ func TestDGateProxyRewritePreserveHost(t *testing.T) {
 func TestDGateProxyRewriteDisableQueryParams(t *testing.T) {
 	testDGateProxyRewrite(t, ProxyParams{
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test"),
 
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		proxyPattern: "/test",
 		proxyPath:    "/test?testing=testing",
@@ -250,10 +259,10 @@ func TestDGateProxyRewriteDisableQueryParams(t *testing.T) {
 
 	testDGateProxyRewrite(t, ProxyParams{
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test?testing=testing"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test?testing=testing"),
 
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		proxyPattern: "/test",
 		proxyPath:    "/test?testing=testing",
@@ -268,10 +277,10 @@ func TestDGateProxyRewriteDisableQueryParams(t *testing.T) {
 func TestDGateProxyRewriteXForwardedHeaders(t *testing.T) {
 	testDGateProxyRewrite(t, ProxyParams{
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test"),
 
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		proxyPattern: "/test",
 		proxyPath:    "/test",
@@ -284,10 +293,10 @@ func TestDGateProxyRewriteXForwardedHeaders(t *testing.T) {
 
 	testDGateProxyRewrite(t, ProxyParams{
 		upstreamUrl:   mustParseURL(t, "http://example.com"),
-		newUpsteamURL: mustParseURL(t, "http://example.com/test"),
+		expectedUpsteamURL: mustParseURL(t, "http://example.com/test"),
 
 		host:    "test.net",
-		newHost: "example.com",
+		expectedHost: "example.com",
 
 		proxyPattern: "/test",
 		proxyPath:    "/test",

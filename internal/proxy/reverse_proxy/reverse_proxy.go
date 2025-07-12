@@ -133,18 +133,13 @@ func (b *reverseProxyBuilder) rewriteStripPath(strip bool) RewriteFunc {
 		in.URL = b.upstreamUrl
 		if strip {
 			if strings.HasSuffix(proxyPatternPath, "*") {
-				// this will remove the proxy path before the wildcard from the upstream url
-				// ex. (upstreamPath: /v1, proxyPattern: '/path/*', reqCall: '/path/test') -> '/v1/test'
 				proxyPattern := strings.TrimSuffix(proxyPatternPath, "*")
 				reqCallNoProxy := strings.TrimPrefix(reqCall, proxyPattern)
 				out.URL.Path = path.Join(upstreamPath, reqCallNoProxy)
 			} else {
-				// this will remove the proxy path from the upstream url
-				// ex. (upstreamPath: /v1, proxyPattern: '/path/{id}', reqCall: '/path/1') -> '/v1'
 				out.URL.Path = upstreamPath
 			}
 		} else {
-			// ex. (upstreamPath: /v1, proxyPattern: '/path/*', reqCall: '/path/test') -> '/v1/path/test'
 			out.URL.Path = path.Join(upstreamPath, reqCall)
 		}
 	}
@@ -159,6 +154,9 @@ func (b *reverseProxyBuilder) rewritePreserveHost(preserve bool) RewriteFunc {
 				inHost = in.Host
 			}
 			out.Header.Set("Host", inHost)
+		} else {
+			out.Host = b.upstreamUrl.Host
+			out.Header.Set("Host", b.upstreamUrl.Host)
 		}
 	}
 }
@@ -240,6 +238,10 @@ func (b *reverseProxyBuilder) Build(upstreamUrl *url.URL, proxyPattern string) (
 	proxy.Transport = b.transport
 	proxy.ErrorLog = b.errorLogger
 	proxy.Rewrite = func(pr *httputil.ProxyRequest) {
+		// Ensure scheme and host are set correctly
+		pr.Out.URL.Scheme = b.upstreamUrl.Scheme
+		pr.Out.URL.Host = b.upstreamUrl.Host
+		
 		b.rewriteStripPath(b.stripPath)(pr.In, pr.Out)
 		b.rewritePreserveHost(b.preserveHost)(pr.In, pr.Out)
 		b.rewriteDisableQueryParams(b.disableQueryParams)(pr.In, pr.Out)
@@ -247,8 +249,8 @@ func (b *reverseProxyBuilder) Build(upstreamUrl *url.URL, proxyPattern string) (
 		if b.customRewrite != nil {
 			b.customRewrite(pr.In, pr.Out)
 		}
-		if pr.Out.URL.Path == "/" {
-			pr.Out.URL.Path = ""
+		if pr.Out.Host == "" {
+			pr.Out.Host = upstreamUrl.Host
 		}
 	}
 	return proxy, nil

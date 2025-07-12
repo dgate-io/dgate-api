@@ -1,6 +1,6 @@
 version: v1
 debug: true
-log_level: ${LOG_LEVEL:-info}
+log_level: ${LOG_LEVEL:-debug}
 disable_default_namespace: true
 tags: [debug, local, test]
 storage:
