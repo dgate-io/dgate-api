@@ -1,0 +1,120 @@
+# DGate v2 Performance Test Configuration
+# 
+# This config is optimized for performance testing with:
+# - Echo server upstream on port 9999
+# - JS module handler (no upstream)
+# - Admin API
+
+version: v1
+log_level: warn  # Reduce logging for performance
+log_json: false
+debug: false
+tags: ["perf-test"]
+
+storage:
+  type: memory  # Use memory for max speed
+
+proxy:
+  port: 8080
+  host: 0.0.0.0
+  
+  global_headers:
+    X-Powered-By: DGate-v2-Perf
+  
+  init_resources:
+    namespaces:
+      - name: "perf"
+        tags: ["performance"]
+    
+    services:
+      - name: "echo-upstream"
+        namespace: "perf"
+        urls: 
+          - "http://127.0.0.1:9999"
+        request_timeout_ms: 5000
+        connect_timeout_ms: 1000
+    
+    modules:
+      # Simple JS handler - just returns JSON
+      - name: "simple-handler"
+        namespace: "perf"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            ctx.json({ 
+              message: 'ok',
+              timestamp: Date.now()
+            });
+          }
+      
+      # Echo handler - mirrors request info
+      - name: "echo-handler"
+        namespace: "perf"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            ctx.json({
+              method: ctx.request.method,
+              path: ctx.request.path,
+              query: ctx.request.query,
+              timestamp: Date.now()
+            });
+          }
+      
+      # Complex handler - does some computation
+      - name: "compute-handler"
+        namespace: "perf"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            // Simulate some computation
+            var result = 0;
+            for (var i = 0; i < 100; i++) {
+              result += Math.sqrt(i);
+            }
+            ctx.json({
+              computed: result,
+              timestamp: Date.now()
+            });
+          }
+    
+    routes:
+      # Proxy route - proxies to echo server
+      - name: "proxy-echo"
+        namespace: "perf"
+        paths: ["/proxy/**"]
+        methods: ["*"]
+        service: "echo-upstream"
+        strip_path: true
+      
+      # JS module - simple response
+      - name: "module-simple"
+        namespace: "perf"
+        paths: ["/module/simple"]
+        methods: ["GET"]
+        modules: ["simple-handler"]
+      
+      # JS module - echo
+      - name: "module-echo"
+        namespace: "perf"
+        paths: ["/module/echo"]
+        methods: ["GET", "POST"]
+        modules: ["echo-handler"]
+      
+      # JS module - compute
+      - name: "module-compute"
+        namespace: "perf"
+        paths: ["/module/compute"]
+        methods: ["GET"]
+        modules: ["compute-handler"]
+    
+    domains:
+      - name: "perf-domain"
+        namespace: "perf"
+        patterns: ["*"]  # Match all domains
+
+admin:
+  port: 9080
+  host: 0.0.0.0
+  allow_list:
+    - "0.0.0.0/0"  # Allow all for perf testing

@@ -1,0 +1,98 @@
+[package]
+name = "dgate"
+version = "2.0.0"
+edition = "2021"
+authors = ["DGate Team"]
+description = "DGate API Gateway - High-performance API gateway with JavaScript module support"
+license = "MIT"
+repository = "https://github.com/dgate-io/dgate"
+keywords = ["api-gateway", "proxy", "javascript", "modules"]
+categories = ["web-programming", "network-programming"]
+
+# Main binaries to install
+[[bin]]
+name = "dgate-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "dgate-cli"
+path = "src/bin/dgate-cli.rs"
+
+# Utility binary (not installed by default)
+[[bin]]
+name = "echo-server"
+path = "src/bin/echo-server.rs"
+required-features = ["perf-tools"]
+
+[features]
+default = []
+perf-tools = []  # Enable to build echo-server
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.44", features = ["full"] }
+
+# Web framework
+axum = { version = "0.8", features = ["http2", "ws"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
+hyper = { version = "1.6", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full", "tokio", "server-auto"] }
+http-body-util = "0.1"
+
+# TLS and reverse proxy
+hyper-rustls = { version = "0.27", features = ["http2", "ring"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "gzip"] }
+ring = "0.17"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# JavaScript engine - QuickJS via rquickjs
+rquickjs = { version = "0.8", features = ["bindgen", "classes", "properties", "array-buffer", "macro"] }
+
+# Storage
+redb = "2.4"
+
+# Configuration
+config = "0.15"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+uuid = { version = "1.12", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+async-trait = "0.1"
+parking_lot = "0.12"
+dashmap = "6.1"
+regex = "1.11"
+glob = "0.3"
+base64 = "0.22"
+clap = { version = "4.5", features = ["derive", "env", "color"] }
+url = { version = "2.5", features = ["serde"] }
+rustls = { version = "0.23", features = ["ring"] }
+tokio-rustls = "0.26"
+rustls-pemfile = "2.2"
+
+# CLI-specific
+colored = "2.1"
+tabled = "0.17"
+dialoguer = "0.11"
+
+# Metrics
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

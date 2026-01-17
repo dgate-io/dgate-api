@@ -1,50 +1,131 @@
+# DGate v2 Configuration
+# Compatible with https://dgate.io/docs/getting-started/dgate-server
+
 version: v1
+log_level: ${LOG_LEVEL:-info}
+log_json: false
 debug: true
-log_level: ${LOG_LEVEL:-debug}
-disable_default_namespace: true
-tags: [debug, local, test]
+tags: ["test", "dgate-v2"]
+
+# Storage configuration
 storage:
   type: file
   dir: .dgate/data/
-test_server:
-  port: 8888
-  host: 0.0.0.0
-  global_headers:
-    X-Test-Header: ${TEST_HEADER:-test}
+
+# Proxy server configuration  
 proxy:
   port: ${PORT:-80}
   host: 0.0.0.0
   console_log_level: info
+  
+  # Global headers added to all responses
+  global_headers:
+    X-Powered-By: DGate-v2
+  
+  # HTTP client transport settings
   client_transport:
     disable_private_ips: false
-    dns_prefer_go: true
+  
+  # Initial resources loaded at startup
   init_resources:
     namespaces:
-      - name: "admin"
+      - name: "default"
+        tags: ["default"]
+      - name: "url_shortener"
+        tags: ["example"]
+    
     services:
-      - name: "admin-svc"
-        namespace: "admin"
+      - name: "httpbin"
+        namespace: "default"
         urls: 
-          - "http://localhost:9080"
+          - "https://httpbin.org"
+        request_timeout_ms: 30000
+    
+    collections:
+      - name: "short_links"
+        namespace: "url_shortener"
+        visibility: private
+    
+    modules:
+      # Health check - using inline raw JavaScript (payloadRaw)
+      - name: "health-check"
+        namespace: "default"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            ctx.json({ 
+              status: 'healthy', 
+              timestamp: new Date().toISOString(),
+              version: 'v0.1.0'
+            });
+          }
+      
+      # Echo handler - using inline raw JavaScript (payloadRaw)
+      - name: "echo-handler"
+        namespace: "default"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            ctx.json({
+              method: ctx.request.method,
+              path: ctx.request.path,
+              query: ctx.request.query,
+              headers: ctx.request.headers,
+              body: ctx.request.body,
+              params: ctx.params
+            });
+          }
+      
+      # URL Shortener - using file reference (payloadFile)
+      - name: "url-shortener"
+        namespace: "url_shortener"
+        moduleType: javascript
+        payloadFile: "modules/url_shortener.js"
+    
     routes:
-      - name: "admin-rt"
-        paths: ["/*"]
+      # Default namespace routes
+      - name: "httpbin-route"
+        namespace: "default"
+        paths: ["/httpbin/**"]
         methods: ["*"]
-        namespace: "admin"
-        service: "admin-svc"
+        service: "httpbin"
+        strip_path: true
+      
+      - name: "echo-route"
+        namespace: "default"
+        paths: ["/echo"]
+        methods: ["GET", "POST"]
+        modules: ["echo-handler"]
+      
+      - name: "health-route"
+        namespace: "default"
+        paths: ["/health"]
+        methods: ["GET"]
+        modules: ["health-check"]
+      
+      # URL Shortener routes
+      - name: "url-shortener-create"
+        namespace: "url_shortener"
+        paths: ["/"]
+        methods: ["GET", "POST"]
+        modules: ["url-shortener"]
+      
+      - name: "url-shortener-redirect"
+        namespace: "url_shortener"
+        paths: ["/{id}"]
+        methods: ["GET"]
+        modules: ["url-shortener"]
+    
     domains:
-      - name: "admin"
-        namespace: "admin"
-        patterns: ["admin.*"]
-  tls:
-    port: ${PORT_SSL:-443}
-    auto_generate: true
-    cert_file: internal/proxy/testdata/server.crt
-    key_file: internal/proxy/testdata/server.key
+      # Route url_shortener.localhost to the url_shortener namespace
+      - name: "url-shortener-domain"
+        namespace: "url_shortener"
+        patterns: ["url_shortener.*", "short.*"]
+
+# Admin API configuration
 admin:
   port: 9080
   host: 0.0.0.0
   allow_list:
     - "127.0.0.1/8"
     - "::1"
-

@@ -1,5 +1,0 @@
-test1: go run ../../cmd/dgate-server/main.go --config test1.yaml
-test2: go run ../../cmd/dgate-server/main.go --config test2.yaml
-test3: go run ../../cmd/dgate-server/main.go --config test3.yaml
-test4: go run ../../cmd/dgate-server/main.go --config test4_watch.yaml
-test5: go run ../../cmd/dgate-server/main.go --config test5_watch.yaml
