@@ -18,7 +18,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[FAIL]${NC} $1"; }
 test_header() { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 
-# Paths - compute from utils.sh location, but don't overwrite SCRIPT_DIR if already set
+# Paths - compute from utils.sh location
 _UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$_UTILS_DIR")"
 ROOT_DIR="$(dirname "$PROJECT_DIR")"
@@ -38,9 +38,13 @@ TESTS_TOTAL=0
 # Cleanup function
 cleanup_processes() {
     log "Cleaning up processes..."
+    # Disable job control messages during cleanup
+    set +m 2>/dev/null || true
     pkill -f "dgate-server" 2>/dev/null || true
-    pkill -f "test-server" 2>/dev/null || true
+    pkill -f "node.*server.js" 2>/dev/null || true
     pkill -f "greeter_server" 2>/dev/null || true
+    # Wait for background jobs to finish and suppress their termination messages
+    wait 2>/dev/null || true
     sleep 1
 }
 

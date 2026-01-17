@@ -1,0 +1,118 @@
+name: DGate Performance Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: false
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - proxy
+          - modules
+          - admin
+          - all
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build DGate and Echo Server
+        run: |
+          cargo build --release --bin dgate-server --bin dgate-cli
+          cargo build --release --bin echo-server --features perf-tools
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Run Performance Tests
+        run: |
+          TEST_TYPE="${{ github.event.inputs.test_type || 'quick' }}"
+          ./perf-tests/run-tests.sh "$TEST_TYPE"
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: |
+            perf-tests/*-results.json
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🚀 Performance Test Results\n\n';
+            
+            // Read results if available
+            const files = ['proxy-results.json', 'modules-results.json', 'admin-results.json'];
+            for (const file of files) {
+              const path = `perf-tests/${file}`;
+              if (fs.existsSync(path)) {
+                comment += `### ${file.replace('-results.json', '').toUpperCase()}\n`;
+                comment += 'Results uploaded as artifacts\n\n';
+              }
+            }
+            
+            comment += '\nSee workflow artifacts for detailed results.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Benchmark comparison between commits
+  benchmark:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo bench
+        run: cargo bench --no-run || echo "No benchmarks defined yet"

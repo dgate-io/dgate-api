@@ -1,0 +1,35 @@
+# Build artifacts
+target/
+*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Test files
+functional-tests/
+perf-tests/
+**/node_modules/
+
+# Documentation
+*.md
+!README.md
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+proxy-results.json
+
+# Config files (will be mounted at runtime)
+config*.yaml
+*.dgate.yaml
+
+# Development modules
+modules/

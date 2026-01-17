@@ -6,8 +6,19 @@ authors = ["DGate Team"]
 description = "DGate API Gateway - High-performance API gateway with JavaScript module support"
 license = "MIT"
 repository = "https://github.com/dgate-io/dgate"
+homepage = "https://github.com/dgate-io/dgate"
+documentation = "https://docs.rs/dgate"
+readme = "README.md"
 keywords = ["api-gateway", "proxy", "javascript", "modules"]
 categories = ["web-programming", "network-programming"]
+exclude = [
+    "functional-tests/",
+    "perf-tests/",
+    "target/",
+    "modules/",
+    "*.yaml",
+    "proxy-results.json",
+]
 
 # Main binaries to install
 [[bin]]

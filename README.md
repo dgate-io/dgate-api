@@ -1,11 +1,16 @@
 # DGate v2 - Rust Edition
 
-A high-performance API Gateway written in Rust, featuring JavaScript module support via Boa engine.
+A high-performance API Gateway written in Rust, featuring JavaScript module support via QuickJS engine.
+
+[![CI](https://github.com/dgate-io/dgate/actions/workflows/ci.yml/badge.svg)](https://github.com/dgate-io/dgate/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/dgate.svg)](https://crates.io/crates/dgate)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://github.com/dgate-io/dgate/pkgs/container/dgate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
 - **High Performance**: Built with Rust and async I/O using Tokio
-- **JavaScript Modules**: Extend functionality with JavaScript using the Boa engine
+- **JavaScript Modules**: Extend functionality with JavaScript using QuickJS (via rquickjs)
 - **Dynamic Routing**: Configure routes, services, and domains dynamically via Admin API
 - **Namespace Isolation**: Organize resources into namespaces for multi-tenancy
 - **Simple KV Storage**: Document storage without JSON schema requirements
@@ -26,7 +31,7 @@ A high-performance API Gateway written in Rust, featuring JavaScript module supp
 │                                              ▼               │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
 │  │   Modules   │◀───│   Handler   │───▶│  Services   │     │
-│  │    (Boa)    │    └─────────────┘    │  (Upstream) │     │
+│  │  (QuickJS)  │    └─────────────┘    │  (Upstream) │     │
 │  └─────────────┘                       └─────────────┘     │
 │                                                              │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
@@ -37,14 +42,36 @@ A high-performance API Gateway written in Rust, featuring JavaScript module supp
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+## Installation
 
-### Build
+### From Cargo (crates.io)
 
 ```bash
-cd dgate-v2
+cargo install dgate
+```
+
+### From Source
+
+```bash
+git clone https://github.com/dgate-io/dgate.git
+cd dgate
 cargo build --release
 ```
+
+### Docker
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/dgate-io/dgate:latest
+
+# Run with a config file
+docker run -d \
+  -p 80:80 -p 443:443 -p 9080:9080 \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  ghcr.io/dgate-io/dgate:latest
+```
+
+## Quick Start
 
 ### Run
 
@@ -269,10 +296,31 @@ DGate v2 is built for high performance:
 | Feature | v1 (Go) | v2 (Rust) |
 |---------|---------|-----------|
 | Runtime | Go 1.21+ | Rust 1.75+ |
-| JS Engine | goja | Boa |
+| JS Engine | goja | QuickJS (rquickjs) |
 | HTTP | chi/stdlib | axum/hyper |
 | Storage | badger/file | redb/memory |
 | Documents | JSON Schema | Simple KV |
+
+## Development
+
+### Running Tests
+
+```bash
+# Unit tests
+cargo test
+
+# Functional tests
+./functional-tests/run-all-tests.sh
+
+# Performance tests (requires k6)
+./perf-tests/run-tests.sh quick
+```
+
+### Building for Release
+
+```bash
+cargo build --release
+```
 
 ## License
 
