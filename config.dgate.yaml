@@ -80,7 +80,7 @@ proxy:
       - name: "url-shortener"
         namespace: "url_shortener"
         moduleType: javascript
-        payloadFile: "modules/url_shortener.js"
+        payloadFile: "module_examples/url_shortener.js"
     
     routes:
       # Default namespace routes
