@@ -37,7 +37,7 @@ proxy:
       - name: "url-shortener"
         namespace: "url_shortener"
         moduleType: javascript
-        payloadFile: "modules/url_shortener.js"
+        payloadFile: "url_shortener.js"
     
     routes:
       - name: "url-shortener-create"
@@ -67,7 +67,7 @@ import TabItem from '@theme/TabItem';
 import Collapse from '@site/src/components/Collapse';
 
 <Collapse title="URL Shortener Module Code">
-```javascript title="modules/url_shortener.js"
+```javascript title="url_shortener.js"
 /**
  * URL Shortener Module for DGate v2
  * 
@@ -156,7 +156,7 @@ dgate-cli domain create --namespace url_shortener --name url-domain \
 
 # Create the module from a file
 dgate-cli module create --namespace url_shortener --name url-shortener \
-    --file ./modules/url_shortener.js
+    --file ./url_shortener.js
 
 # Create routes for the URL shortener
 dgate-cli route create --namespace url_shortener --name url-shortener-home \
