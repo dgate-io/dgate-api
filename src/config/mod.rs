@@ -42,6 +42,10 @@ pub struct DGateConfig {
     #[serde(default)]
     pub test_server: Option<TestServerConfig>,
 
+    /// Cluster configuration for distributed mode
+    #[serde(default)]
+    pub cluster: Option<ClusterConfig>,
+
     /// Directory where the config file is located (for resolving relative paths)
     #[serde(skip)]
     pub config_dir: std::path::PathBuf,
@@ -69,6 +73,7 @@ impl Default for DGateConfig {
             proxy: ProxyConfig::default(),
             admin: None,
             test_server: None,
+            cluster: None,
             config_dir: std::env::current_dir().unwrap_or_default(),
         }
     }
@@ -552,6 +557,112 @@ pub struct DomainSpec {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_file: Option<String>,
+}
+
+/// Cluster configuration for distributed mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterConfig {
+    /// Enable cluster mode
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Unique node ID for this instance
+    #[serde(default = "default_node_id")]
+    pub node_id: u64,
+
+    /// Address this node advertises to other nodes
+    #[serde(default = "default_advertise_addr")]
+    pub advertise_addr: String,
+
+    /// Bootstrap a new cluster (only for first node)
+    #[serde(default)]
+    pub bootstrap: bool,
+
+    /// Initial cluster members (for joining existing cluster)
+    #[serde(default)]
+    pub initial_members: Vec<ClusterMember>,
+
+    /// Node discovery configuration
+    #[serde(default)]
+    pub discovery: Option<DiscoveryConfig>,
+}
+
+fn default_node_id() -> u64 {
+    1
+}
+
+fn default_advertise_addr() -> String {
+    "127.0.0.1:9090".to_string()
+}
+
+impl Default for ClusterConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            node_id: default_node_id(),
+            advertise_addr: default_advertise_addr(),
+            bootstrap: false,
+            initial_members: Vec::new(),
+            discovery: None,
+        }
+    }
+}
+
+/// Cluster member information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterMember {
+    /// Node ID
+    pub id: u64,
+    /// Node address (host:port)
+    pub addr: String,
+}
+
+/// Node discovery configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryConfig {
+    /// Discovery type
+    #[serde(default, rename = "type")]
+    pub discovery_type: DiscoveryType,
+
+    /// DNS name to resolve for node discovery
+    #[serde(default)]
+    pub dns_name: Option<String>,
+
+    /// Port to use for discovered nodes
+    #[serde(default = "default_dns_port")]
+    pub dns_port: u16,
+
+    /// How often to refresh discovery (in seconds)
+    #[serde(default = "default_refresh_interval")]
+    pub refresh_interval_secs: u64,
+}
+
+fn default_dns_port() -> u16 {
+    9090
+}
+
+fn default_refresh_interval() -> u64 {
+    30
+}
+
+impl Default for DiscoveryConfig {
+    fn default() -> Self {
+        Self {
+            discovery_type: DiscoveryType::default(),
+            dns_name: None,
+            dns_port: default_dns_port(),
+            refresh_interval_secs: default_refresh_interval(),
+        }
+    }
+}
+
+/// Discovery type
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DiscoveryType {
+    #[default]
+    Static,
+    Dns,
 }
 
 #[cfg(test)]

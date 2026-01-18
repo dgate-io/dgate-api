@@ -53,7 +53,7 @@ SUITES_TO_RUN=()
 if [[ $# -gt 0 ]]; then
     SUITES_TO_RUN=("$@")
 else
-    SUITES_TO_RUN=("http2" "websocket" "grpc" "quic")
+    SUITES_TO_RUN=("http2" "websocket" "grpc" "quic" "cluster")
 fi
 
 # Run selected suites
@@ -71,9 +71,12 @@ for suite in "${SUITES_TO_RUN[@]}"; do
         quic|http3)
             run_suite "QUIC/HTTP3 Tests" "$SCRIPT_DIR/quic"
             ;;
+        cluster)
+            run_suite "Cluster Replication Tests" "$SCRIPT_DIR/cluster"
+            ;;
         *)
             echo "Unknown test suite: $suite"
-            echo "Available: http2, websocket, grpc, quic"
+            echo "Available: http2, websocket, grpc, quic, cluster"
             ;;
     esac
 done

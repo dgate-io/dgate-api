@@ -18,6 +18,11 @@ include = [
     "LICENSE",
 ]
 
+# Library crate (for integration tests and embedding)
+[lib]
+name = "dgate"
+path = "src/lib.rs"
+
 # Main binaries to install
 [[bin]]
 name = "dgate-server"
@@ -42,7 +47,7 @@ perf-tools = []  # Enable to build echo-server
 tokio = { version = "1.44", features = ["full"] }
 
 # Web framework
-axum = { version = "0.8", features = ["http2", "ws"] }
+axum = { version = "0.8", features = ["http2", "ws", "macros"] }
 tower = { version = "0.5", features = ["util", "timeout", "limit"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
 hyper = { version = "1.6", features = ["full"] }
@@ -64,6 +69,9 @@ rquickjs = { version = "0.8", features = ["bindgen", "classes", "properties", "a
 
 # Storage
 redb = "3.1"
+
+# Raft consensus for cluster mode
+openraft = { version = "0.9", features = ["serde", "storage-v2"] }
 
 # Configuration
 config = "0.15"
@@ -88,6 +96,7 @@ url = { version = "2.5", features = ["serde"] }
 rustls = { version = "0.23", features = ["ring"] }
 tokio-rustls = "0.26"
 rustls-pemfile = "2.2"
+rand = "0.8"
 
 # CLI-specific
 colored = "3.1.1"

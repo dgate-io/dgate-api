@@ -19,9 +19,12 @@ error() { echo -e "${RED}[FAIL]${NC} $1"; }
 test_header() { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 
 # Paths - compute from utils.sh location
+# utils.sh is in tests/functional-tests/common
+# We need to go up 3 levels to get to the project root
 _UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$_UTILS_DIR")"
-ROOT_DIR="$(dirname "$PROJECT_DIR")"
+FUNCTIONAL_DIR="$(dirname "$_UTILS_DIR")"
+TESTS_DIR="$(dirname "$FUNCTIONAL_DIR")"
+ROOT_DIR="$(dirname "$TESTS_DIR")"
 DGATE_BIN="$ROOT_DIR/target/release/dgate-server"
 DGATE_CLI="$ROOT_DIR/target/release/dgate-cli"
 

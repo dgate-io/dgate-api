@@ -18,8 +18,10 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+use crate::cluster::{ClusterManager, DGateStateMachine};
 use crate::config::DGateConfig;
 use crate::modules::{ModuleExecutor, RequestContext, ResponseContext};
 use crate::resources::*;
@@ -113,6 +115,10 @@ pub struct ProxyState {
     >,
     /// Shared reqwest client for upstream requests
     reqwest_client: reqwest::Client,
+    /// Cluster manager (None if running in standalone mode)
+    cluster: RwLock<Option<Arc<ClusterManager>>>,
+    /// Channel receiver for cluster-applied changes
+    change_rx: RwLock<Option<mpsc::UnboundedReceiver<ChangeLog>>>,
 }
 
 impl ProxyState {
@@ -152,7 +158,118 @@ impl ProxyState {
             change_hash: AtomicU64::new(0),
             http_client: client,
             reqwest_client,
+            cluster: RwLock::new(None),
+            change_rx: RwLock::new(None),
         })
+    }
+
+    /// Initialize cluster mode if configured
+    pub async fn init_cluster(self: &Arc<Self>) -> anyhow::Result<()> {
+        let cluster_config = match &self.config.cluster {
+            Some(cfg) if cfg.enabled => cfg.clone(),
+            _ => {
+                info!("Running in standalone mode (cluster not enabled)");
+                return Ok(());
+            }
+        };
+
+        info!("Initializing cluster mode with node_id={}", cluster_config.node_id);
+
+        // Create channel for change notifications
+        let (change_tx, change_rx) = mpsc::unbounded_channel();
+        *self.change_rx.write() = Some(change_rx);
+
+        // Create state machine with our store
+        let state_machine = Arc::new(DGateStateMachine::with_change_notifier(
+            self.store.clone(),
+            change_tx,
+        ));
+
+        // Create cluster manager
+        let cluster_manager = ClusterManager::new(cluster_config.clone(), state_machine).await?;
+        let cluster_manager = Arc::new(cluster_manager);
+
+        // Initialize the cluster
+        cluster_manager.initialize().await?;
+
+        *self.cluster.write() = Some(cluster_manager);
+
+        // Start background task to process cluster changes
+        let proxy_state = self.clone();
+        tokio::spawn(async move {
+            proxy_state.process_cluster_changes().await;
+        });
+
+        info!("Cluster mode initialized successfully");
+        Ok(())
+    }
+
+    /// Process changes applied through the cluster
+    async fn process_cluster_changes(self: Arc<Self>) {
+        let mut rx = match self.change_rx.write().take() {
+            Some(rx) => rx,
+            None => return,
+        };
+
+        while let Some(changelog) = rx.recv().await {
+            debug!("Processing cluster-applied change: {:?}", changelog.cmd);
+            
+            // Rebuild routers/domains as needed based on the change type
+            if let Err(e) = self.handle_cluster_change(&changelog) {
+                error!("Failed to process cluster change: {}", e);
+            }
+
+            // Update change hash
+            self.change_hash.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Handle a change that was applied through the cluster
+    fn handle_cluster_change(&self, changelog: &ChangeLog) -> Result<(), ProxyError> {
+        match changelog.cmd {
+            ChangeCommand::AddRoute
+            | ChangeCommand::DeleteRoute
+            | ChangeCommand::AddService
+            | ChangeCommand::DeleteService
+            | ChangeCommand::AddModule
+            | ChangeCommand::DeleteModule => {
+                // Rebuild router for the affected namespace
+                self.rebuild_router(&changelog.namespace)?;
+
+                // Handle module executor updates for modules
+                if matches!(changelog.cmd, ChangeCommand::AddModule | ChangeCommand::DeleteModule) {
+                    if changelog.cmd == ChangeCommand::AddModule {
+                        if let Ok(module) = serde_json::from_value::<Module>(changelog.item.clone()) {
+                            let mut executor = self.module_executor.write();
+                            if let Err(e) = executor.add_module(&module) {
+                                warn!("Failed to add module to executor: {}", e);
+                            }
+                        }
+                    } else {
+                        let mut executor = self.module_executor.write();
+                        executor.remove_module(&changelog.namespace, &changelog.name);
+                    }
+                }
+            }
+            ChangeCommand::AddNamespace => {
+                // New namespace - will be populated by routes
+            }
+            ChangeCommand::DeleteNamespace => {
+                self.routers.remove(&changelog.name);
+            }
+            ChangeCommand::AddDomain | ChangeCommand::DeleteDomain => {
+                self.rebuild_domains()?;
+            }
+            _ => {
+                // Other changes (secrets, collections, documents) don't require router/domain updates
+            }
+        }
+        Ok(())
+    }
+
+    /// Get the cluster manager (if in cluster mode)
+    pub fn cluster(&self) -> Option<Arc<ClusterManager>> {
+        self.cluster.read().clone()
     }
 
     pub fn store(&self) -> &ProxyStore {
@@ -172,7 +289,27 @@ impl ProxyState {
     }
 
     /// Apply a change log entry
+    /// Apply a change log entry
+    /// 
+    /// In cluster mode, this proposes the change to the Raft cluster.
+    /// The change will be applied once it's committed and replicated.
+    /// In standalone mode, the change is applied directly.
     pub async fn apply_changelog(&self, changelog: ChangeLog) -> Result<(), ProxyError> {
+        // Check if we're in cluster mode - clone the Arc to avoid holding lock across await
+        let cluster = self.cluster.read().clone();
+        if let Some(cluster) = cluster {
+            // In cluster mode, propose the change through Raft
+            // The change will be applied via the state machine
+            cluster
+                .propose(changelog.clone())
+                .await
+                .map_err(|e| ProxyError::Cluster(e.to_string()))?;
+
+            debug!("Proposed changelog {} to cluster", changelog.id);
+            return Ok(());
+        }
+
+        // Standalone mode - apply directly
         // Store the changelog
         self.store
             .append_changelog(&changelog)
@@ -1059,6 +1196,9 @@ pub enum ProxyError {
 
     #[error("IO error: {0}")]
     Io(String),
+
+    #[error("Cluster error: {0}")]
+    Cluster(String),
 }
 
 /// Convert a path pattern to a regex

@@ -4,6 +4,7 @@
 //! request/response modification, routing, and more.
 
 mod admin;
+mod cluster;
 mod config;
 mod modules;
 mod proxy;
@@ -71,6 +72,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Create proxy state
     let proxy_state = ProxyState::new(config.clone());
+
+    // Initialize cluster mode if configured
+    proxy_state.init_cluster().await?;
 
     // Restore from change logs
     proxy_state.restore_from_changelogs().await?;

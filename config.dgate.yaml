@@ -129,3 +129,43 @@ admin:
   allow_list:
     - "127.0.0.1/8"
     - "::1"
+
+# Cluster configuration (Raft consensus)
+# Uncomment to enable cluster mode for high availability
+#
+# cluster:
+#   enabled: true
+#   
+#   # Unique node ID (must be different for each node in the cluster)
+#   node_id: 1
+#   
+#   # Address this node advertises to other nodes
+#   advertise_addr: "192.168.1.10:9090"
+#   
+#   # Port for Raft inter-node communication
+#   raft_port: 9090
+#   
+#   # Bootstrap as single-node cluster (use for first node only)
+#   bootstrap: true
+#   
+#   # Static list of initial cluster members (alternative to discovery)
+#   # initial_members:
+#   #   - id: 1
+#   #     addr: "192.168.1.10:9090"
+#   #   - id: 2
+#   #     addr: "192.168.1.11:9090"
+#   #   - id: 3
+#   #     addr: "192.168.1.12:9090"
+#   
+#   # DNS-based discovery (useful for Kubernetes headless services)
+#   # discovery:
+#   #   type: dns
+#   #   dns_name: "dgate-headless.default.svc.cluster.local"
+#   #   dns_port: 9090
+#   #   refresh_interval_secs: 30
+#   
+#   # Raft tuning parameters
+#   heartbeat_interval_ms: 500
+#   election_timeout_min_ms: 1500
+#   election_timeout_max_ms: 3000
+#   snapshot_threshold: 1000

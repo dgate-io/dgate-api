@@ -162,7 +162,12 @@ pub fn create_router(state: AdminState) -> Router {
                     delete(delete_document),
                 )
                 // Change logs
-                .route("/changelog", get(list_changelogs)),
+                .route("/changelog", get(list_changelogs))
+                // Cluster endpoints
+                .route("/cluster/status", get(cluster_status))
+                .route("/cluster/members", get(cluster_members))
+                .route("/cluster/members/{node_id}", put(cluster_add_member))
+                .route("/cluster/members/{node_id}", delete(cluster_remove_member)),
         )
         .with_state(state)
 }
@@ -799,4 +804,146 @@ async fn list_changelogs(
         .list_changelogs()
         .map_err(|e| ApiError::internal(e.to_string()))?;
     Ok(Json(ApiResponse::success(logs)))
+}
+
+// Cluster handlers
+
+/// Cluster status response
+#[derive(Debug, Serialize)]
+pub struct ClusterStatus {
+    pub enabled: bool,
+    pub mode: String,
+    pub node_id: Option<u64>,
+    pub is_leader: bool,
+    pub leader_id: Option<u64>,
+    pub term: Option<u64>,
+    pub last_applied_log: Option<u64>,
+    pub commit_index: Option<u64>,
+}
+
+/// Cluster member info
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClusterMemberInfo {
+    pub id: u64,
+    pub addr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_leader: Option<bool>,
+}
+
+/// Request body for adding a cluster member
+#[derive(Debug, Deserialize)]
+pub struct AddMemberRequest {
+    pub addr: String,
+}
+
+async fn cluster_status(
+    State(state): State<AdminState>,
+) -> Result<Json<ApiResponse<ClusterStatus>>, ApiError> {
+    // Clone the Arc before any awaits to avoid holding lock across await points
+    let cluster = state.proxy.cluster();
+    
+    if let Some(cluster) = cluster {
+        let metrics = cluster.metrics().await;
+        let is_leader = cluster.is_leader().await;
+        let leader_id = cluster.leader_id().await;
+
+        let status = ClusterStatus {
+            enabled: true,
+            mode: "cluster".to_string(),
+            node_id: Some(metrics.id),
+            is_leader,
+            leader_id,
+            term: metrics.current_term,
+            last_applied_log: metrics.last_applied,
+            commit_index: metrics.committed,
+        };
+
+        Ok(Json(ApiResponse::success(status)))
+    } else {
+        let status = ClusterStatus {
+            enabled: false,
+            mode: "standalone".to_string(),
+            node_id: None,
+            is_leader: true, // Standalone is always the leader
+            leader_id: None,
+            term: None,
+            last_applied_log: None,
+            commit_index: None,
+        };
+
+        Ok(Json(ApiResponse::success(status)))
+    }
+}
+
+async fn cluster_members(
+    State(state): State<AdminState>,
+) -> Result<Json<ApiResponse<Vec<ClusterMemberInfo>>>, ApiError> {
+    let cluster = state.proxy.cluster();
+    
+    if let Some(cluster) = cluster {
+        let metrics = cluster.metrics().await;
+        let leader_id = cluster.leader_id().await;
+
+        let members: Vec<ClusterMemberInfo> = metrics
+            .members
+            .iter()
+            .map(|member| ClusterMemberInfo {
+                id: member.id,
+                addr: member.addr.clone(),
+                is_leader: Some(leader_id == Some(member.id)),
+            })
+            .collect();
+
+        Ok(Json(ApiResponse::success(members)))
+    } else {
+        // Standalone mode - return empty list
+        Ok(Json(ApiResponse::success(Vec::new())))
+    }
+}
+
+async fn cluster_add_member(
+    State(state): State<AdminState>,
+    Path(node_id): Path<u64>,
+    Json(request): Json<AddMemberRequest>,
+) -> Result<Json<ApiResponse<ClusterMemberInfo>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    if !cluster.is_leader().await {
+        return Err(ApiError::bad_request("This node is not the leader"));
+    }
+
+    cluster
+        .add_node(node_id, request.addr.clone())
+        .await
+        .map_err(|e| ApiError::internal(format!("Failed to add node: {}", e)))?;
+
+    Ok(Json(ApiResponse::success(ClusterMemberInfo {
+        id: node_id,
+        addr: request.addr,
+        is_leader: Some(false),
+    })))
+}
+
+async fn cluster_remove_member(
+    State(state): State<AdminState>,
+    Path(node_id): Path<u64>,
+) -> Result<Json<ApiResponse<()>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    if !cluster.is_leader().await {
+        return Err(ApiError::bad_request("This node is not the leader"));
+    }
+
+    cluster
+        .remove_node(node_id)
+        .await
+        .map_err(|e| ApiError::internal(format!("Failed to remove node: {}", e)))?;
+
+    Ok(Json(ApiResponse::success(())))
 }
