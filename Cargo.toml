@@ -63,6 +63,10 @@ ring = "0.17"
 tokio-tungstenite = "0.28"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
+# HTTP/2 h2c support for gRPC
+h2 = "0.4"
+bytes = "1.10"
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

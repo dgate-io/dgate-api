@@ -15,7 +15,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+TESTS_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$TESTS_DIR")"
 DGATE_BIN="$PROJECT_DIR/target/release/dgate-server"
 ECHO_BIN="$PROJECT_DIR/target/release/echo-server"
 DGATE_PORT=8080

@@ -53,12 +53,15 @@ SUITES_TO_RUN=()
 if [[ $# -gt 0 ]]; then
     SUITES_TO_RUN=("$@")
 else
-    SUITES_TO_RUN=("http2" "websocket" "grpc" "quic" "simple-replication" "raft-consensus")
+    SUITES_TO_RUN=("modules" "http2" "websocket" "grpc" "quic" "simple-replication" "raft-consensus")
 fi
 
 # Run selected suites
 for suite in "${SUITES_TO_RUN[@]}"; do
     case "$suite" in
+        modules|js|ts)
+            run_suite "JavaScript/TypeScript Module Tests" "$SCRIPT_DIR/modules"
+            ;;
         http2)
             run_suite "HTTP/2 Tests" "$SCRIPT_DIR/http2"
             ;;
@@ -79,7 +82,7 @@ for suite in "${SUITES_TO_RUN[@]}"; do
             ;;
         *)
             echo "Unknown test suite: $suite"
-            echo "Available: http2, websocket, grpc, quic, simple-replication, raft-consensus"
+            echo "Available: modules, http2, websocket, grpc, quic, simple-replication, raft-consensus"
             ;;
     esac
 done

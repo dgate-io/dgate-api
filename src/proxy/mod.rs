@@ -1,7 +1,8 @@
 //! Proxy module for DGate
 //!
 //! Handles incoming HTTP requests, routes them through modules,
-//! and forwards them to upstream services. Supports WebSocket upgrades.
+//! and forwards them to upstream services. Supports WebSocket upgrades
+//! and gRPC proxying.
 
 use axum::{
     body::Body,
@@ -9,16 +10,22 @@ use axum::{
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
 };
+use bytes::Bytes;
 use dashmap::DashMap;
 use futures_util::{SinkExt, StreamExt};
+use h2::client;
+use http_body_util::StreamBody;
+use hyper::body::Frame;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use parking_lot::RwLock;
 use regex::Regex;
 use std::collections::HashMap;
+use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 use tracing::{debug, error, info, warn};
@@ -725,6 +732,15 @@ impl ProxyState {
             .unwrap_or(false)
     }
 
+    /// Check if a request is a gRPC request
+    fn is_grpc_request(req: &Request) -> bool {
+        req.headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.starts_with("application/grpc"))
+            .unwrap_or(false)
+    }
+
     /// Handle an incoming proxy request
     pub async fn handle_request(&self, req: Request) -> Response {
         let start = Instant::now();
@@ -732,8 +748,9 @@ impl ProxyState {
         let uri = req.uri().clone();
         let path = uri.path();
 
-        // Check if this is a WebSocket upgrade request
+        // Check if this is a WebSocket upgrade request or gRPC request
         let is_websocket = Self::is_websocket_upgrade(&req);
+        let is_grpc = Self::is_grpc_request(&req);
 
         // Extract host from request
         let host = req
@@ -780,6 +797,18 @@ impl ProxyState {
                     .await;
             } else {
                 return (StatusCode::BAD_GATEWAY, "No upstream service for WebSocket")
+                    .into_response();
+            }
+        }
+
+        // Handle gRPC request if detected
+        if is_grpc {
+            if let Some(ref service) = compiled_route.service {
+                return self
+                    .handle_grpc_proxy(req, service, &compiled_route, start)
+                    .await;
+            } else {
+                return (StatusCode::BAD_GATEWAY, "No upstream service for gRPC")
                     .into_response();
             }
         }
@@ -1340,6 +1369,269 @@ impl ProxyState {
             route_name,
             elapsed.as_millis()
         );
+    }
+
+    /// Handle gRPC proxy request
+    ///
+    /// gRPC requires:
+    /// - HTTP/2 over h2c (cleartext) or TLS
+    /// - Streaming request/response bodies
+    /// - Proper trailer forwarding for grpc-status
+    async fn handle_grpc_proxy(
+        &self,
+        req: Request,
+        service: &Service,
+        compiled_route: &CompiledRoute,
+        start: Instant,
+    ) -> Response {
+        // Get upstream URL
+        let upstream_url = match service.urls.first() {
+            Some(url) => url.clone(),
+            None => {
+                error!("No upstream URLs configured for gRPC service: {}", service.name);
+                return (StatusCode::BAD_GATEWAY, "No upstream configured").into_response();
+            }
+        };
+
+        // Parse upstream URL to get host:port
+        let parsed = match url::Url::parse(&upstream_url) {
+            Ok(u) => u,
+            Err(e) => {
+                error!("Invalid upstream URL: {}", e);
+                return (StatusCode::BAD_GATEWAY, "Invalid upstream URL").into_response();
+            }
+        };
+
+        let host = parsed.host_str().unwrap_or("127.0.0.1");
+        let port = parsed.port().unwrap_or(80);
+        let addr = format!("{}:{}", host, port);
+
+        // Resolve address
+        let socket_addr = match addr.to_socket_addrs() {
+            Ok(mut addrs) => match addrs.next() {
+                Some(addr) => addr,
+                None => {
+                    error!("Could not resolve address: {}", addr);
+                    return (StatusCode::BAD_GATEWAY, "Address resolution failed").into_response();
+                }
+            },
+            Err(e) => {
+                error!("Address resolution error: {}", e);
+                return (StatusCode::BAD_GATEWAY, "Address resolution failed").into_response();
+            }
+        };
+
+        // Connect to upstream via TCP
+        let tcp_stream = match TcpStream::connect(socket_addr).await {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Failed to connect to gRPC upstream {}: {}", addr, e);
+                return (StatusCode::BAD_GATEWAY, "Upstream connection failed").into_response();
+            }
+        };
+
+        // Perform HTTP/2 handshake (h2c)
+        let (h2_client, h2_connection) = match client::handshake(tcp_stream).await {
+            Ok((c, conn)) => (c, conn),
+            Err(e) => {
+                error!("HTTP/2 handshake failed: {}", e);
+                return (StatusCode::BAD_GATEWAY, "HTTP/2 handshake failed").into_response();
+            }
+        };
+
+        // Spawn a task to drive the connection
+        tokio::spawn(async move {
+            if let Err(e) = h2_connection.await {
+                warn!("HTTP/2 connection error: {}", e);
+            }
+        });
+
+        // Wait for the client to be ready
+        let mut h2_client = match h2_client.ready().await {
+            Ok(c) => c,
+            Err(e) => {
+                error!("HTTP/2 client not ready: {}", e);
+                return (StatusCode::BAD_GATEWAY, "HTTP/2 client error").into_response();
+            }
+        };
+
+        // Build the request path
+        let mut target_path = req.uri().path().to_string();
+        if compiled_route.route.strip_path {
+            for pattern in &compiled_route.path_patterns {
+                if let Some(caps) = pattern.captures(&target_path) {
+                    if let Some(m) = caps.get(0) {
+                        target_path = target_path[m.end()..].to_string();
+                        if !target_path.starts_with('/') {
+                            target_path = format!("/{}", target_path);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Build query string
+        let query_string = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
+        
+        // Build full URI with scheme and authority (required for h2 client)
+        let full_uri = format!("http://{}{}{}", addr, target_path, query_string);
+
+        // Build HTTP/2 request
+        let mut h2_request = hyper::Request::builder()
+            .method(req.method().clone())
+            .uri(&full_uri)
+            .version(hyper::Version::HTTP_2);
+
+        // Copy headers (but update authority)
+        for (key, value) in req.headers() {
+            let key_str = key.as_str().to_lowercase();
+            // Skip pseudo headers and connection-specific headers
+            if key_str.starts_with(':')
+                || key_str == "host"
+                || key_str == "connection"
+                || key_str == "keep-alive"
+                || key_str == "transfer-encoding"
+            {
+                continue;
+            }
+            h2_request = h2_request.header(key, value);
+        }
+
+        // Set the authority header for gRPC
+        h2_request = h2_request.header("host", &addr);
+
+        // Collect body from the original request
+        let body_bytes = match axum::body::to_bytes(req.into_body(), 10 * 1024 * 1024).await {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                error!("Failed to read request body: {}", e);
+                return (StatusCode::BAD_REQUEST, "Failed to read body").into_response();
+            }
+        };
+
+        // Finalize request
+        let h2_req = match h2_request.body(()) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to build HTTP/2 request: {}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Request build error").into_response();
+            }
+        };
+
+        // Determine if we should end the stream immediately (no body) or send body
+        let end_of_stream = body_bytes.is_empty();
+        
+        // Send the request
+        let (response_future, mut send_stream) = match h2_client.send_request(h2_req, end_of_stream) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to send HTTP/2 request: {}", e);
+                return (StatusCode::BAD_GATEWAY, "Request send failed").into_response();
+            }
+        };
+
+        // Send body data if present
+        if !body_bytes.is_empty() {
+            // Reserve capacity for the body data
+            send_stream.reserve_capacity(body_bytes.len());
+            
+            // Wait for capacity to be available
+            match futures_util::future::poll_fn(|cx| send_stream.poll_capacity(cx)).await {
+                Some(Ok(_)) => {}
+                Some(Err(e)) => {
+                    error!("Failed to reserve capacity: {}", e);
+                    return (StatusCode::BAD_GATEWAY, "Capacity error").into_response();
+                }
+                None => {
+                    error!("Stream closed before capacity available");
+                    return (StatusCode::BAD_GATEWAY, "Stream closed").into_response();
+                }
+            }
+            
+            // Send the body data
+            if let Err(e) = send_stream.send_data(body_bytes.clone(), true) {
+                error!("Failed to send request body: {}", e);
+                return (StatusCode::BAD_GATEWAY, "Body send failed").into_response();
+            }
+        }
+
+        // Wait for response
+        let response = match response_future.await {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to receive HTTP/2 response: {}", e);
+                return (StatusCode::BAD_GATEWAY, "Response receive failed").into_response();
+            }
+        };
+
+        let (parts, mut recv_body) = response.into_parts();
+
+        // Read response body
+        let mut response_data = Vec::new();
+        while let Some(chunk) = recv_body.data().await {
+            match chunk {
+                Ok(data) => {
+                    // Release flow control capacity
+                    let _ = recv_body.flow_control().release_capacity(data.len());
+                    response_data.extend_from_slice(&data);
+                }
+                Err(e) => {
+                    error!("Error reading response body: {}", e);
+                    return (StatusCode::BAD_GATEWAY, "Response body error").into_response();
+                }
+            }
+        }
+
+        // Get trailers (important for gRPC status)
+        let trailers = recv_body.trailers().await.ok().flatten();
+
+        // Build response with proper trailer support for gRPC
+        let mut builder = Response::builder().status(parts.status);
+
+        // Copy response headers
+        for (key, value) in parts.headers.iter() {
+            let key_lower = key.as_str().to_lowercase();
+            // Skip some headers but keep gRPC-specific ones
+            if matches!(key_lower.as_str(), "transfer-encoding" | "connection") {
+                continue;
+            }
+            builder = builder.header(key, value);
+        }
+
+        let elapsed = start.elapsed();
+        debug!(
+            "gRPC {} -> {} {} ({}ms)",
+            target_path,
+            addr,
+            parts.status,
+            elapsed.as_millis()
+        );
+
+        // Create a body that includes trailers for gRPC
+        // gRPC requires trailers to be sent as HTTP/2 trailing headers
+        let body = if let Some(trailers) = trailers {
+            // Create a stream that sends data frames and then trailers
+            let data_frame = Frame::data(Bytes::from(response_data));
+            let trailers_frame = Frame::trailers(trailers);
+            
+            let frames = vec![
+                Ok::<_, std::convert::Infallible>(data_frame),
+                Ok(trailers_frame),
+            ];
+            
+            let stream = futures_util::stream::iter(frames);
+            let stream_body = StreamBody::new(stream);
+            Body::new(stream_body)
+        } else {
+            Body::from(response_data)
+        };
+
+        builder
+            .body(body)
+            .unwrap_or_else(|_| {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
+            })
     }
 
     /// Get all documents for a namespace (for module access)

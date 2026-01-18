@@ -10,18 +10,25 @@ A high-performance API Gateway written in Rust, featuring JavaScript module supp
 ## Features
 
 - **High Performance**: Built with Rust and async I/O using Tokio
-- **JavaScript Modules**: Extend functionality with JavaScript using QuickJS (via rquickjs)
 - **Dynamic Routing**: Configure routes, services, and domains dynamically via Admin API
 - **Namespace Isolation**: Organize resources into namespaces for multi-tenancy
 - **Simple KV Storage**: Document storage without JSON schema requirements
 - **TLS Support**: HTTPS with dynamic certificate loading per domain
 - **Reverse Proxy**: Forward requests to upstream services with load balancing support
 
-## Architecture
+## Supported
+
+- HTTP/1.1 ✅
+- HTTP/2 ✅
+- WebSocket ✅
+- gRPC ✅
+- QUIC/HTTP3 ❌
+
+## Resource Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        DGate v2                              │
+│                        DGate V2                              │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
