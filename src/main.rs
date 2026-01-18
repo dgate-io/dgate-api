@@ -51,10 +51,6 @@ struct Args {
     /// Path to configuration file
     #[arg(short, long)]
     config: Option<String>,
-
-    /// Show version and exit
-    #[arg(short, long)]
-    version: bool,
 }
 
 #[tokio::main]
@@ -65,11 +61,6 @@ async fn main() -> anyhow::Result<()> {
         .expect("Failed to install rustls crypto provider");
 
     let args = Args::parse();
-
-    if args.version {
-        println!("dgate-server v{}", VERSION);
-        return Ok(());
-    }
 
     // Print banner
     if std::env::var("DG_DISABLE_BANNER").is_err() {
@@ -195,7 +186,12 @@ mod tests {
 
     #[test]
     fn test_args_parsing() {
-        let args = Args::try_parse_from(["dgate-server", "--version"]).unwrap();
-        assert!(args.version);
+        // Test with config argument
+        let args = Args::try_parse_from(["dgate-server", "--config", "test.yaml"]).unwrap();
+        assert_eq!(args.config, Some("test.yaml".to_string()));
+
+        // Test without arguments
+        let args = Args::try_parse_from(["dgate-server"]).unwrap();
+        assert_eq!(args.config, None);
     }
 }

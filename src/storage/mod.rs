@@ -7,7 +7,7 @@ use crate::resources::{
     ChangeLog, Collection, Document, Domain, Module, Namespace, Route, Secret, Service,
 };
 use dashmap::DashMap;
-use redb::ReadableTable;
+use redb::{ReadableDatabase, ReadableTable};
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 use std::sync::Arc;

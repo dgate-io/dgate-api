@@ -9,7 +9,7 @@ repository = "https://github.com/dgate-io/dgate"
 homepage = "https://github.com/dgate-io/dgate"
 documentation = "https://docs.rs/dgate"
 readme = "README.md"
-keywords = ["api-gateway", "proxy", "javascript", "modules"]
+keywords = ["api-gateway", "proxy", "javascript", "modules", "kv-storage", "tls", "reverse-proxy"]
 categories = ["web-programming", "network-programming"]
 exclude = [
     "functional-tests/",
@@ -65,7 +65,7 @@ serde_yaml = "0.9"
 rquickjs = { version = "0.8", features = ["bindgen", "classes", "properties", "array-buffer", "macro"] }
 
 # Storage
-redb = "2.4"
+redb = "3.1"
 
 # Configuration
 config = "0.15"
@@ -92,13 +92,13 @@ tokio-rustls = "0.26"
 rustls-pemfile = "2.2"
 
 # CLI-specific
-colored = "2.1"
-tabled = "0.17"
-dialoguer = "0.11"
+colored = "3.1.1"
+tabled = "0.20.0"
+dialoguer = "0.12.0"
 
 # Metrics
 metrics = "0.24"
-metrics-exporter-prometheus = "0.16"
+metrics-exporter-prometheus = "0.18.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
