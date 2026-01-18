@@ -11,7 +11,7 @@ use tokio::time::timeout;
 
 // Import from the dgate crate
 use dgate::cluster::{ClusterManager, DGateStateMachine};
-use dgate::config::{ClusterConfig, ClusterMember, StorageConfig, StorageType};
+use dgate::config::{ClusterConfig, ClusterMember, ClusterMode, StorageConfig, StorageType};
 use dgate::resources::{
     ChangeCommand, ChangeLog, Collection, CollectionVisibility, Document, Domain, Module,
     ModuleType, Namespace, Route, Secret, Service,
@@ -32,12 +32,15 @@ fn create_test_storage() -> Arc<ProxyStore> {
 fn create_test_cluster_config(node_id: u64) -> ClusterConfig {
     ClusterConfig {
         enabled: true,
+        mode: ClusterMode::default(),
         node_id,
         advertise_addr: format!("127.0.0.1:{}", 9090 + node_id),
         bootstrap: true,
         initial_members: vec![ClusterMember {
             id: node_id,
             addr: format!("127.0.0.1:{}", 9090 + node_id),
+            admin_port: None,
+            tls: false,
         }],
         discovery: None,
     }

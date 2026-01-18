@@ -89,10 +89,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
                 self.target, status, body
             );
             return Err(RPCError::Network(openraft::error::NetworkError::new(
-                &std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("HTTP {}: {}", status, body),
-                ),
+                &std::io::Error::other(format!("HTTP {}: {}", status, body)),
             )));
         }
 
@@ -131,10 +128,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
                 self.target, status, body
             );
             return Err(RPCError::Network(openraft::error::NetworkError::new(
-                &std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("HTTP {}: {}", status, body),
-                ),
+                &std::io::Error::other(format!("HTTP {}: {}", status, body)),
             )));
         }
 
@@ -167,10 +161,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
             let body = resp.text().await.unwrap_or_default();
             warn!("vote failed to node {}: {} - {}", self.target, status, body);
             return Err(RPCError::Network(openraft::error::NetworkError::new(
-                &std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("HTTP {}: {}", status, body),
-                ),
+                &std::io::Error::other(format!("HTTP {}: {}", status, body)),
             )));
         }
 

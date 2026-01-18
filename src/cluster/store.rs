@@ -49,7 +49,7 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
 
     async fn get_log_state(&mut self) -> Result<LogState<TypeConfig>, StorageError<NodeId>> {
         let logs = self.logs.read();
-        let last_purged = self.last_purged.read().clone();
+        let last_purged = *self.last_purged.read();
 
         let last = logs.iter().next_back().map(|(_, v)| *v.get_log_id());
 
@@ -61,9 +61,9 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
 
     async fn get_log_reader(&mut self) -> Self::LogReader {
         Self {
-            vote: RwLock::new(self.vote.read().clone()),
+            vote: RwLock::new(*self.vote.read()),
             logs: RwLock::new(self.logs.read().clone()),
-            last_purged: RwLock::new(self.last_purged.read().clone()),
+            last_purged: RwLock::new(*self.last_purged.read()),
         }
     }
 
@@ -74,7 +74,7 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
     }
 
     async fn read_vote(&mut self) -> Result<Option<Vote<NodeId>>, StorageError<NodeId>> {
-        Ok(self.vote.read().clone())
+        Ok(*self.vote.read())
     }
 
     async fn append<I>(

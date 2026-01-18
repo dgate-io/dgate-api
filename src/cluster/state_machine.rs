@@ -49,7 +49,7 @@ impl Clone for DGateStateMachine {
     fn clone(&self) -> Self {
         Self {
             store: self.store.clone(),
-            last_applied: RwLock::new(self.last_applied.read().clone()),
+            last_applied: RwLock::new(*self.last_applied.read()),
             last_membership: RwLock::new(self.last_membership.read().clone()),
             change_tx: self.change_tx.clone(),
             snapshot_data: RwLock::new(self.snapshot_data.read().clone()),
@@ -274,7 +274,7 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
         &mut self,
     ) -> Result<(Option<LogId<NodeId>>, StoredMembership<NodeId, BasicNode>), StorageError<NodeId>>
     {
-        let last_applied = self.last_applied.read().clone();
+        let last_applied = *self.last_applied.read();
         let last_membership = self.last_membership.read().clone();
         Ok((last_applied, last_membership))
     }
@@ -322,7 +322,7 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
 
     async fn get_snapshot_builder(&mut self) -> Self::SnapshotBuilder {
         let snapshot_data = self.snapshot_data.read().clone();
-        let last_applied = self.last_applied.read().clone();
+        let last_applied = *self.last_applied.read();
         let last_membership = self.last_membership.read().clone();
 
         DGateSnapshotBuilder {
@@ -372,7 +372,7 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
         &mut self,
     ) -> Result<Option<Snapshot<TypeConfig>>, StorageError<NodeId>> {
         let snapshot_data = self.snapshot_data.read().clone();
-        let last_applied = self.last_applied.read().clone();
+        let last_applied = *self.last_applied.read();
         let last_membership = self.last_membership.read().clone();
 
         if last_applied.is_none() {
