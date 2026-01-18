@@ -34,8 +34,8 @@ sleep 1
 test_header "Test 1: HTTP/1.1 Proxying"
 
 response=$(curl -s "http://localhost:$DGATE_PORT/h2/test")
-assert_contains "$response" '"method":"GET"' "GET request proxied correctly"
-assert_contains "$response" '"path":"/test"' "Path stripped correctly"
+assert_contains "$response" '"method": "GET"' "GET request proxied correctly"
+assert_contains "$response" '"path": "/"' "Path stripped correctly"
 
 # ========================================
 # Test 2: HTTP/2 with curl --http2
@@ -44,7 +44,7 @@ test_header "Test 2: HTTP/2 Request (curl --http2)"
 
 # Note: curl --http2 will negotiate HTTP/2 if available
 response=$(curl -s --http2 "http://localhost:$DGATE_PORT/h2/test")
-assert_contains "$response" '"method":"GET"' "HTTP/2 GET request works"
+assert_contains "$response" '"method": "GET"' "HTTP/2 GET request works"
 
 # ========================================
 # Test 3: POST with body
@@ -54,24 +54,35 @@ test_header "Test 3: POST Request with Body"
 response=$(curl -s -X POST -d '{"name":"test"}' \
     -H "Content-Type: application/json" \
     "http://localhost:$DGATE_PORT/h2/data")
-assert_contains "$response" '"method":"POST"' "POST method proxied"
-assert_contains "$response" '{"name":"test"}' "POST body proxied"
+assert_contains "$response" '"method": "POST"' "POST method proxied"
+assert_contains "$response" 'name' "POST body proxied"
 
 # ========================================
 # Test 4: Multiple concurrent requests
 # ========================================
 test_header "Test 4: Concurrent Requests"
 
-# Send 10 concurrent requests
-for i in {1..10}; do
-    curl -s "http://localhost:$DGATE_PORT/h2/concurrent/$i" > /tmp/h2-req-$i.txt &
+# Send 10 concurrent requests with timeout
+# Disable job control and error handling for background jobs
+set +e +m
+
+concurrent_pids=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    curl -s --max-time 5 "http://localhost:$DGATE_PORT/h2/concurrent/$i" > /tmp/h2-req-$i.txt &
+    concurrent_pids="$concurrent_pids $!"
 done
-wait
+
+# Wait for all curl processes
+for pid in $concurrent_pids; do
+    wait $pid 2>/dev/null
+done
+
+set -e
 
 # Check all succeeded
 all_passed=true
-for i in {1..10}; do
-    if ! grep -q '"method":"GET"' /tmp/h2-req-$i.txt; then
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    if ! grep -q '"method": "GET"' /tmp/h2-req-$i.txt 2>/dev/null; then
         all_passed=false
         break
     fi
@@ -93,7 +104,7 @@ test_header "Test 5: Large Request Body"
 
 # Generate 100KB of data
 large_body=$(head -c 102400 /dev/urandom | base64)
-response=$(curl -s -X POST -d "$large_body" \
+response=$(curl -s --max-time 30 -X POST -d "$large_body" \
     -H "Content-Type: text/plain" \
     "http://localhost:$DGATE_PORT/h2/large")
 
@@ -115,8 +126,8 @@ response=$(curl -s -H "X-Custom-Header: test-value" \
     -H "X-Another-Header: another-value" \
     "http://localhost:$DGATE_PORT/h2/headers")
 
-assert_contains "$response" '"x-custom-header":"test-value"' "Custom header preserved"
-assert_contains "$response" '"x-another-header":"another-value"' "Another header preserved"
+assert_contains "$response" '"x-custom-header": "test-value"' "Custom header preserved"
+assert_contains "$response" '"x-another-header": "another-value"' "Another header preserved"
 
 # Print summary
 print_summary

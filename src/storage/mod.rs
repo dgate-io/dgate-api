@@ -56,11 +56,20 @@ impl MemoryStorage {
         }
     }
 
-    fn get_table(
+    /// Get or create a table for write operations (returns exclusive lock)
+    fn get_or_create_table(
         &self,
         table: &str,
     ) -> dashmap::mapref::one::RefMut<'_, String, DashMap<String, Vec<u8>>> {
         self.tables.entry(table.to_string()).or_default()
+    }
+
+    /// Get a table for read operations (returns shared lock, or None if table doesn't exist)
+    fn get_table_for_read(
+        &self,
+        table: &str,
+    ) -> Option<dashmap::mapref::one::Ref<'_, String, DashMap<String, Vec<u8>>>> {
+        self.tables.get(table)
     }
 }
 
@@ -72,34 +81,45 @@ impl Default for MemoryStorage {
 
 impl Storage for MemoryStorage {
     fn get(&self, table: &str, key: &str) -> StorageResult<Option<Vec<u8>>> {
-        let table_ref = self.get_table(table);
-        Ok(table_ref.get(key).map(|v| v.clone()))
+        // Use read-only access for get operations
+        match self.get_table_for_read(table) {
+            Some(table_ref) => Ok(table_ref.get(key).map(|v| v.clone())),
+            None => Ok(None),
+        }
     }
 
     fn set(&self, table: &str, key: &str, value: &[u8]) -> StorageResult<()> {
-        let table_ref = self.get_table(table);
+        // Use write access for set operations
+        let table_ref = self.get_or_create_table(table);
         table_ref.insert(key.to_string(), value.to_vec());
         Ok(())
     }
 
     fn delete(&self, table: &str, key: &str) -> StorageResult<()> {
-        let table_ref = self.get_table(table);
-        table_ref.remove(key);
+        // Use read-only access - if table doesn't exist, nothing to delete
+        if let Some(table_ref) = self.get_table_for_read(table) {
+            table_ref.remove(key);
+        }
         Ok(())
     }
 
     fn list(&self, table: &str, prefix: &str) -> StorageResult<Vec<(String, Vec<u8>)>> {
-        let table_ref = self.get_table(table);
-        let results: Vec<(String, Vec<u8>)> = table_ref
-            .iter()
-            .filter(|entry| entry.key().starts_with(prefix))
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect();
-        Ok(results)
+        // Use read-only access for list operations
+        match self.get_table_for_read(table) {
+            Some(table_ref) => {
+                let results: Vec<(String, Vec<u8>)> = table_ref
+                    .iter()
+                    .filter(|entry| entry.key().starts_with(prefix))
+                    .map(|entry| (entry.key().clone(), entry.value().clone()))
+                    .collect();
+                Ok(results)
+            }
+            None => Ok(Vec::new()),
+        }
     }
 
     fn clear(&self, table: &str) -> StorageResult<()> {
-        if let Some(table_ref) = self.tables.get(table) {
+        if let Some(table_ref) = self.get_table_for_read(table) {
             table_ref.clear();
         }
         Ok(())

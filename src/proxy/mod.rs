@@ -1,15 +1,16 @@
 //! Proxy module for DGate
 //!
 //! Handles incoming HTTP requests, routes them through modules,
-//! and forwards them to upstream services.
+//! and forwards them to upstream services. Supports WebSocket upgrades.
 
 use axum::{
     body::Body,
-    extract::Request,
+    extract::{FromRequest, Request, WebSocketUpgrade},
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
 };
 use dashmap::DashMap;
+use futures_util::{SinkExt, StreamExt};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use parking_lot::RwLock;
@@ -19,6 +20,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
 use crate::cluster::{ClusterManager, DGateStateMachine};
@@ -714,12 +716,24 @@ impl ProxyState {
         None
     }
 
+    /// Check if a request is a WebSocket upgrade request
+    fn is_websocket_upgrade(req: &Request) -> bool {
+        req.headers()
+            .get(header::UPGRADE)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.eq_ignore_ascii_case("websocket"))
+            .unwrap_or(false)
+    }
+
     /// Handle an incoming proxy request
     pub async fn handle_request(&self, req: Request) -> Response {
         let start = Instant::now();
         let method = req.method().clone();
         let uri = req.uri().clone();
         let path = uri.path();
+
+        // Check if this is a WebSocket upgrade request
+        let is_websocket = Self::is_websocket_upgrade(&req);
 
         // Extract host from request
         let host = req
@@ -757,6 +771,18 @@ impl ProxyState {
         };
 
         drop(router);
+
+        // Handle WebSocket upgrade if detected
+        if is_websocket {
+            if let Some(ref service) = compiled_route.service {
+                return self
+                    .handle_websocket_upgrade(req, service, &compiled_route, start)
+                    .await;
+            } else {
+                return (StatusCode::BAD_GATEWAY, "No upstream service for WebSocket")
+                    .into_response();
+            }
+        }
 
         // Build request context for modules
         let query_params: HashMap<String, String> = uri
@@ -1019,11 +1045,32 @@ impl ProxyState {
                 // Build response
                 let mut builder = Response::builder().status(status);
 
+                // Copy headers, but filter out hop-by-hop headers that shouldn't be forwarded
+                // and headers that conflict with our new body (we've already consumed the chunked stream)
                 for (key, value) in headers.iter() {
+                    let key_lower = key.as_str().to_lowercase();
+                    // Skip hop-by-hop headers and transfer-related headers
+                    if matches!(
+                        key_lower.as_str(),
+                        "transfer-encoding"
+                            | "connection"
+                            | "keep-alive"
+                            | "proxy-authenticate"
+                            | "proxy-authorization"
+                            | "te"
+                            | "trailer"
+                            | "upgrade"
+                            | "content-length" // We'll set our own based on final_body
+                    ) {
+                        continue;
+                    }
                     if let Ok(v) = value.to_str() {
                         builder = builder.header(key.as_str(), v);
                     }
                 }
+
+                // Set correct content-length for the final body
+                builder = builder.header("content-length", final_body.len().to_string());
 
                 // Add global headers
                 for (key, value) in &self.config.proxy.global_headers {
@@ -1074,6 +1121,225 @@ impl ProxyState {
                 (StatusCode::BAD_GATEWAY, "Upstream error").into_response()
             }
         }
+    }
+
+    /// Handle WebSocket upgrade requests
+    ///
+    /// This method handles the WebSocket upgrade handshake and relays
+    /// messages between the client and upstream server.
+    async fn handle_websocket_upgrade(
+        &self,
+        req: Request,
+        service: &Service,
+        compiled_route: &CompiledRoute,
+        start: Instant,
+    ) -> Response {
+        // Get upstream URL
+        let upstream_url = match service.urls.first() {
+            Some(url) => url,
+            None => {
+                error!("No upstream URLs configured for service: {}", service.name);
+                return (StatusCode::BAD_GATEWAY, "No upstream configured").into_response();
+            }
+        };
+
+        // Build the WebSocket URL for upstream
+        let request_path = req.uri().path();
+        let mut target_path = request_path.to_string();
+        if compiled_route.route.strip_path {
+            // Strip the matched path prefix
+            for pattern in &compiled_route.path_patterns {
+                if let Some(caps) = pattern.captures(request_path) {
+                    if let Some(m) = caps.get(0) {
+                        target_path = request_path[m.end()..].to_string();
+                        if !target_path.starts_with('/') {
+                            target_path = format!("/{}", target_path);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Convert HTTP URL to WebSocket URL
+        let ws_upstream = upstream_url
+            .replace("http://", "ws://")
+            .replace("https://", "wss://");
+        let upstream_ws_url = format!("{}{}", ws_upstream.trim_end_matches('/'), target_path);
+
+        // Add query string if present
+        let full_upstream_url = if let Some(query) = req.uri().query() {
+            format!("{}?{}", upstream_ws_url, query)
+        } else {
+            upstream_ws_url
+        };
+
+        debug!(
+            "WebSocket upgrade: {} -> {}",
+            req.uri().path(),
+            full_upstream_url
+        );
+
+        // Use axum's WebSocket extractor to handle the upgrade
+        let ws_upgrade: WebSocketUpgrade = match WebSocketUpgrade::from_request(req, &()).await {
+            Ok(ws) => ws,
+            Err(e) => {
+                error!("Failed to extract WebSocket upgrade: {}", e);
+                return (StatusCode::BAD_REQUEST, "Invalid WebSocket request").into_response();
+            }
+        };
+
+        // Clone values needed in the async closure
+        let upstream_url_clone = full_upstream_url.clone();
+        let route_name = compiled_route.route.name.clone();
+
+        // Handle the WebSocket upgrade
+        ws_upgrade.on_upgrade(move |client_socket| async move {
+            Self::relay_websocket(client_socket, upstream_url_clone, route_name, start).await
+        })
+    }
+
+    /// Relay WebSocket messages between client and upstream
+    async fn relay_websocket(
+        client_socket: axum::extract::ws::WebSocket,
+        upstream_url: String,
+        route_name: String,
+        start: Instant,
+    ) {
+        // Connect to upstream WebSocket server
+        let upstream_ws = match connect_async(&upstream_url).await {
+            Ok((ws, _)) => ws,
+            Err(e) => {
+                error!(
+                    "Failed to connect to upstream WebSocket {}: {}",
+                    upstream_url, e
+                );
+                return;
+            }
+        };
+
+        debug!(
+            "WebSocket connected to upstream: {} (route: {})",
+            upstream_url, route_name
+        );
+
+        // Split both connections into sender/receiver halves
+        let (mut client_tx, mut client_rx) = client_socket.split();
+        let (mut upstream_tx, mut upstream_rx) = upstream_ws.split();
+
+        // Relay messages from client to upstream
+        let client_to_upstream = async {
+            while let Some(msg) = client_rx.next().await {
+                match msg {
+                    Ok(axum::extract::ws::Message::Text(text)) => {
+                        if upstream_tx
+                            .send(WsMessage::Text(text.to_string().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(axum::extract::ws::Message::Binary(data)) => {
+                        if upstream_tx
+                            .send(WsMessage::Binary(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(axum::extract::ws::Message::Ping(data)) => {
+                        if upstream_tx
+                            .send(WsMessage::Ping(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(axum::extract::ws::Message::Pong(data)) => {
+                        if upstream_tx
+                            .send(WsMessage::Pong(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(axum::extract::ws::Message::Close(_)) | Err(_) => {
+                        let _ = upstream_tx.send(WsMessage::Close(None)).await;
+                        break;
+                    }
+                }
+            }
+        };
+
+        // Relay messages from upstream to client
+        let upstream_to_client = async {
+            while let Some(msg) = upstream_rx.next().await {
+                match msg {
+                    Ok(WsMessage::Text(text)) => {
+                        if client_tx
+                            .send(axum::extract::ws::Message::Text(text.to_string().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(WsMessage::Binary(data)) => {
+                        if client_tx
+                            .send(axum::extract::ws::Message::Binary(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(WsMessage::Ping(data)) => {
+                        if client_tx
+                            .send(axum::extract::ws::Message::Ping(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(WsMessage::Pong(data)) => {
+                        if client_tx
+                            .send(axum::extract::ws::Message::Pong(data.to_vec().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(WsMessage::Close(_)) | Err(_) => {
+                        let _ = client_tx
+                            .send(axum::extract::ws::Message::Close(None))
+                            .await;
+                        break;
+                    }
+                    Ok(WsMessage::Frame(_)) => {
+                        // Raw frames are handled internally
+                    }
+                }
+            }
+        };
+
+        // Run both relay tasks concurrently
+        tokio::select! {
+            _ = client_to_upstream => {},
+            _ = upstream_to_client => {},
+        }
+
+        let elapsed = start.elapsed();
+        debug!(
+            "WebSocket connection closed (route: {}, duration: {}ms)",
+            route_name,
+            elapsed.as_millis()
+        );
     }
 
     /// Get all documents for a namespace (for module access)
