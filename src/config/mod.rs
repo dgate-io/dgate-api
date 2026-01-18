@@ -41,7 +41,7 @@ pub struct DGateConfig {
 
     #[serde(default)]
     pub test_server: Option<TestServerConfig>,
-    
+
     /// Directory where the config file is located (for resolving relative paths)
     #[serde(skip)]
     pub config_dir: std::path::PathBuf,
@@ -81,13 +81,13 @@ impl DGateConfig {
         let content = std::fs::read_to_string(path)?;
         let content = Self::expand_env_vars(&content);
         let mut config: Self = serde_yaml::from_str(&content)?;
-        
+
         // Set the config directory for resolving relative paths
         config.config_dir = path
             .parent()
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-        
+
         Ok(config)
     }
 
@@ -108,11 +108,7 @@ impl DGateConfig {
             Some(p) if !p.is_empty() => Self::load_from_file(p),
             _ => {
                 // Try common config locations
-                let paths = [
-                    "config.dgate.yaml",
-                    "dgate.yaml",
-                    "/etc/dgate/config.yaml",
-                ];
+                let paths = ["config.dgate.yaml", "dgate.yaml", "/etc/dgate/config.yaml"];
                 for path in paths {
                     if Path::new(path).exists() {
                         return Self::load_from_file(path);
@@ -457,7 +453,7 @@ pub struct InitResources {
 }
 
 /// Module specification with optional file loading
-/// 
+///
 /// Supports three ways to specify module code:
 /// 1. `payload` - base64 encoded module code
 /// 2. `payloadRaw` - plain text module code (will be base64 encoded automatically)  
@@ -466,22 +462,30 @@ pub struct InitResources {
 pub struct ModuleSpec {
     pub name: String,
     pub namespace: String,
-    
+
     /// Base64 encoded payload (original format)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payload: Option<String>,
-    
+
     /// Raw JavaScript/TypeScript code (plain text, will be encoded)
-    #[serde(default, rename = "payloadRaw", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "payloadRaw",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub payload_raw: Option<String>,
-    
+
     /// Path to file containing module code (relative to config file location)
-    #[serde(default, rename = "payloadFile", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "payloadFile",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub payload_file: Option<String>,
-    
+
     #[serde(default, rename = "moduleType")]
     pub module_type: crate::resources::ModuleType,
-    
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
 }
@@ -491,31 +495,42 @@ impl ModuleSpec {
     /// Priority: payload_file > payload_raw > payload
     pub fn resolve_payload(&self, config_dir: &std::path::Path) -> anyhow::Result<String> {
         use base64::Engine;
-        
+
         // Priority 1: File path (relative to config)
         if let Some(ref file_path) = self.payload_file {
             let full_path = config_dir.join(file_path);
-            let content = std::fs::read_to_string(&full_path)
-                .map_err(|e| anyhow::anyhow!("Failed to read module file '{}': {}", full_path.display(), e))?;
+            let content = std::fs::read_to_string(&full_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read module file '{}': {}",
+                    full_path.display(),
+                    e
+                )
+            })?;
             return Ok(base64::engine::general_purpose::STANDARD.encode(content));
         }
-        
+
         // Priority 2: Raw payload (plain text)
         if let Some(ref raw) = self.payload_raw {
             return Ok(base64::engine::general_purpose::STANDARD.encode(raw));
         }
-        
+
         // Priority 3: Base64 encoded payload
         if let Some(ref payload) = self.payload {
             return Ok(payload.clone());
         }
-        
+
         // No payload specified
-        Err(anyhow::anyhow!("Module '{}' has no payload specified (use payload, payloadRaw, or payloadFile)", self.name))
+        Err(anyhow::anyhow!(
+            "Module '{}' has no payload specified (use payload, payloadRaw, or payloadFile)",
+            self.name
+        ))
     }
-    
+
     /// Convert to a Module resource with resolved payload
-    pub fn to_module(&self, config_dir: &std::path::Path) -> anyhow::Result<crate::resources::Module> {
+    pub fn to_module(
+        &self,
+        config_dir: &std::path::Path,
+    ) -> anyhow::Result<crate::resources::Module> {
         Ok(crate::resources::Module {
             name: self.name.clone(),
             namespace: self.namespace.clone(),

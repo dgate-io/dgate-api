@@ -193,7 +193,8 @@ impl ModuleContext {
         }
 
         let runtime = Runtime::new().map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
-        let context = Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
+        let context =
+            Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
 
         let mut result = req_ctx.clone();
 
@@ -201,7 +202,7 @@ impl ModuleContext {
             for source in &self.sources {
                 // Set up globals
                 self.setup_globals(&ctx)?;
-                
+
                 // Set up context object
                 self.setup_request_context(&ctx, &result)?;
 
@@ -236,13 +237,12 @@ impl ModuleContext {
         req_ctx: &RequestContext,
     ) -> Result<ModuleResponse, ModuleError> {
         if self.sources.is_empty() {
-            return Err(ModuleError::FunctionNotFound(
-                "requestHandler".to_string(),
-            ));
+            return Err(ModuleError::FunctionNotFound("requestHandler".to_string()));
         }
 
         let runtime = Runtime::new().map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
-        let context = Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
+        let context =
+            Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
 
         context.with(|ctx| {
             self.setup_globals(&ctx)?;
@@ -283,7 +283,8 @@ impl ModuleContext {
         }
 
         let runtime = Runtime::new().map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
-        let context = Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
+        let context =
+            Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
 
         context.with(|ctx| {
             self.setup_globals(&ctx)?;
@@ -321,7 +322,8 @@ impl ModuleContext {
         }
 
         let runtime = Runtime::new().map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
-        let context = Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
+        let context =
+            Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
 
         context.with(|ctx| {
             self.setup_globals(&ctx)?;
@@ -359,7 +361,8 @@ impl ModuleContext {
         }
 
         let runtime = Runtime::new().map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
-        let context = Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
+        let context =
+            Context::full(&runtime).map_err(|e| ModuleError::RuntimeError(e.to_string()))?;
 
         context.with(|ctx| {
             self.setup_globals(&ctx)?;
@@ -380,13 +383,17 @@ impl ModuleContext {
                 combined
             );
 
-            let result: Value = ctx.eval(wrapped.as_str())
+            let result: Value = ctx
+                .eval(wrapped.as_str())
                 .map_err(|e| ModuleError::JsError(e.to_string()))?;
 
             if result.is_null() || result.is_undefined() {
                 Ok(None)
             } else if let Some(s) = result.as_string() {
-                Ok(Some(s.to_string().map_err(|e| ModuleError::JsError(e.to_string()))?))
+                Ok(Some(
+                    s.to_string()
+                        .map_err(|e| ModuleError::JsError(e.to_string()))?,
+                ))
             } else {
                 Ok(None)
             }
@@ -405,7 +412,7 @@ impl ModuleContext {
                 info: function() {}
             };
         "#;
-        
+
         ctx.eval::<Value, _>(console_code)
             .map_err(|e| ModuleError::JsError(e.to_string()))?;
 
@@ -593,17 +600,15 @@ impl ModuleContext {
             })
         "#;
 
-        let result: String = ctx.eval(extract_code)
+        let result: String = ctx
+            .eval(extract_code)
             .map_err(|e| ModuleError::JsError(e.to_string()))?;
 
         let parsed: serde_json::Value =
             serde_json::from_str(&result).map_err(|e| ModuleError::JsError(e.to_string()))?;
 
         Ok(RequestContext {
-            method: parsed["method"]
-                .as_str()
-                .unwrap_or("GET")
-                .to_string(),
+            method: parsed["method"].as_str().unwrap_or("GET").to_string(),
             path: parsed["path"].as_str().unwrap_or("/").to_string(),
             query: parsed["query"]
                 .as_object()
@@ -621,9 +626,7 @@ impl ModuleContext {
                         .collect()
                 })
                 .unwrap_or_default(),
-            body: parsed["body"]
-                .as_str()
-                .map(|s| s.as_bytes().to_vec()),
+            body: parsed["body"].as_str().map(|s| s.as_bytes().to_vec()),
             params: parsed["params"]
                 .as_object()
                 .map(|o| {
@@ -640,11 +643,7 @@ impl ModuleContext {
             service_name: parsed["service"].as_str().map(|s| s.to_string()),
             documents: parsed["documents"]
                 .as_object()
-                .map(|o| {
-                    o.iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect()
-                })
+                .map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default(),
         })
     }
@@ -657,7 +656,8 @@ impl ModuleContext {
             })
         "#;
 
-        let result: String = ctx.eval(extract_code)
+        let result: String = ctx
+            .eval(extract_code)
             .map_err(|e| ModuleError::JsError(e.to_string()))?;
 
         let parsed: serde_json::Value =
@@ -680,11 +680,7 @@ impl ModuleContext {
                 .unwrap_or_default(),
             documents: parsed["documents"]
                 .as_object()
-                .map(|o| {
-                    o.iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect()
-                })
+                .map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default(),
         })
     }
@@ -697,7 +693,8 @@ impl ModuleContext {
             JSON.stringify(__res__)
         "#;
 
-        let result: String = ctx.eval(extract_code)
+        let result: String = ctx
+            .eval(extract_code)
             .map_err(|e| ModuleError::JsError(e.to_string()))?;
 
         let parsed: serde_json::Value =
@@ -713,9 +710,7 @@ impl ModuleContext {
                         .collect()
                 })
                 .unwrap_or_default(),
-            body: parsed["body"]
-                .as_str()
-                .map(|s| s.as_bytes().to_vec()),
+            body: parsed["body"].as_str().map(|s| s.as_bytes().to_vec()),
         })
     }
 }

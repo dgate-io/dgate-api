@@ -40,7 +40,10 @@ struct CompiledRoute {
 impl CompiledRoute {
     fn matches(&self, path: &str, method: &str) -> Option<HashMap<String, String>> {
         // Check method
-        let method_match = self.methods.iter().any(|m| m == "*" || m.eq_ignore_ascii_case(method));
+        let method_match = self
+            .methods
+            .iter()
+            .any(|m| m == "*" || m.eq_ignore_ascii_case(method));
         if !method_match {
             return None;
         }
@@ -80,7 +83,11 @@ impl NamespaceRouter {
         self.routes.push(compiled);
     }
 
-    fn find_route(&self, path: &str, method: &str) -> Option<(&CompiledRoute, HashMap<String, String>)> {
+    fn find_route(
+        &self,
+        path: &str,
+        method: &str,
+    ) -> Option<(&CompiledRoute, HashMap<String, String>)> {
         for route in &self.routes {
             if let Some(params) = route.matches(path, method) {
                 return Some((route, params));
@@ -99,7 +106,10 @@ pub struct ProxyState {
     domains: RwLock<Vec<ResolvedDomain>>,
     ready: AtomicBool,
     change_hash: AtomicU64,
-    http_client: Client<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>, Body>,
+    http_client: Client<
+        hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+        Body,
+    >,
     /// Shared reqwest client for upstream requests
     reqwest_client: reqwest::Client,
 }
@@ -427,8 +437,7 @@ impl ProxyState {
 
             // Add namespaces
             for ns in &init.namespaces {
-                let changelog =
-                    ChangeLog::new(ChangeCommand::AddNamespace, &ns.name, &ns.name, ns);
+                let changelog = ChangeLog::new(ChangeCommand::AddNamespace, &ns.name, &ns.name, ns);
                 self.apply_changelog(changelog).await?;
             }
 
@@ -450,12 +459,8 @@ impl ProxyState {
 
             // Add services
             for svc in &init.services {
-                let changelog = ChangeLog::new(
-                    ChangeCommand::AddService,
-                    &svc.namespace,
-                    &svc.name,
-                    svc,
-                );
+                let changelog =
+                    ChangeLog::new(ChangeCommand::AddService, &svc.namespace, &svc.name, svc);
                 self.apply_changelog(changelog).await?;
             }
 
@@ -477,13 +482,23 @@ impl ProxyState {
                 // Load cert from file if specified (relative to config dir)
                 if let Some(ref path) = dom_spec.cert_file {
                     let full_path = self.config.config_dir.join(path);
-                    domain.cert = std::fs::read_to_string(&full_path)
-                        .map_err(|e| ProxyError::Io(format!("Failed to read cert file '{}': {}", full_path.display(), e)))?;
+                    domain.cert = std::fs::read_to_string(&full_path).map_err(|e| {
+                        ProxyError::Io(format!(
+                            "Failed to read cert file '{}': {}",
+                            full_path.display(),
+                            e
+                        ))
+                    })?;
                 }
                 if let Some(ref path) = dom_spec.key_file {
                     let full_path = self.config.config_dir.join(path);
-                    domain.key = std::fs::read_to_string(&full_path)
-                        .map_err(|e| ProxyError::Io(format!("Failed to read key file '{}': {}", full_path.display(), e)))?;
+                    domain.key = std::fs::read_to_string(&full_path).map_err(|e| {
+                        ProxyError::Io(format!(
+                            "Failed to read key file '{}': {}",
+                            full_path.display(),
+                            e
+                        ))
+                    })?;
                 }
 
                 let changelog = ChangeLog::new(
@@ -497,23 +512,15 @@ impl ProxyState {
 
             // Add collections
             for col in &init.collections {
-                let changelog = ChangeLog::new(
-                    ChangeCommand::AddCollection,
-                    &col.namespace,
-                    &col.name,
-                    col,
-                );
+                let changelog =
+                    ChangeLog::new(ChangeCommand::AddCollection, &col.namespace, &col.name, col);
                 self.apply_changelog(changelog).await?;
             }
 
             // Add documents
             for doc in &init.documents {
-                let changelog = ChangeLog::new(
-                    ChangeCommand::AddDocument,
-                    &doc.namespace,
-                    &doc.id,
-                    doc,
-                );
+                let changelog =
+                    ChangeLog::new(ChangeCommand::AddDocument, &doc.namespace, &doc.id, doc);
                 self.apply_changelog(changelog).await?;
             }
 
@@ -628,7 +635,7 @@ impl ProxyState {
 
         // Get documents from storage for module access
         let documents = self.get_documents_for_namespace(&namespace.name).await;
-        
+
         let mut req_ctx = RequestContext {
             method: method.to_string(),
             path: path.to_string(),
@@ -645,10 +652,8 @@ impl ProxyState {
         // Execute modules (scope to drop executor lock before any awaits)
         let handler_result = if !compiled_route.modules.is_empty() {
             let executor = self.module_executor.read();
-            let module_ctx = executor.create_context(
-                &compiled_route.route.modules,
-                &namespace.name,
-            );
+            let module_ctx =
+                executor.create_context(&compiled_route.route.modules, &namespace.name);
 
             // Execute request modifier
             match module_ctx.execute_request_modifier(&req_ctx) {
@@ -662,11 +667,15 @@ impl ProxyState {
             // If no service, use request handler
             if compiled_route.service.is_none() {
                 let result = module_ctx.execute_request_handler(&req_ctx);
-                let error_result = if result.is_err() {
-                    Some(module_ctx.execute_error_handler(&req_ctx, &result.as_ref().unwrap_err().to_string()))
-                } else {
-                    None
-                };
+                let error_result =
+                    if result.is_err() {
+                        Some(module_ctx.execute_error_handler(
+                            &req_ctx,
+                            &result.as_ref().unwrap_err().to_string(),
+                        ))
+                    } else {
+                        None
+                    };
                 Some((result, error_result))
             } else {
                 None
@@ -674,7 +683,7 @@ impl ProxyState {
         } else {
             None
         };
-        
+
         // Handle the request handler result (outside the executor lock scope)
         if let Some((result, error_result)) = handler_result {
             match result {
@@ -688,38 +697,37 @@ impl ProxyState {
                     let elapsed = start.elapsed();
                     debug!(
                         "{} {} -> {} ({}ms, handler)",
-                        method, path, response.status_code,
+                        method,
+                        path,
+                        response.status_code,
                         elapsed.as_millis()
                     );
 
                     // Save any modified documents
                     if !response.documents.is_empty() {
-                        self.save_module_documents(&namespace.name, &response.documents).await;
+                        self.save_module_documents(&namespace.name, &response.documents)
+                            .await;
                     }
 
-                    return builder
-                        .body(Body::from(response.body))
-                        .unwrap_or_else(|_| {
-                            (StatusCode::INTERNAL_SERVER_ERROR, "Response build error")
-                                .into_response()
-                        });
+                    return builder.body(Body::from(response.body)).unwrap_or_else(|_| {
+                        (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
+                    });
                 }
                 Err(e) => {
                     error!("Request handler error: {}", e);
 
                     // Try error handler
                     if let Some(Ok(error_response)) = error_result {
-                        let mut builder =
-                            Response::builder().status(error_response.status_code);
+                        let mut builder = Response::builder().status(error_response.status_code);
                         for (key, value) in error_response.headers {
                             builder = builder.header(key, value);
                         }
-                        return builder.body(Body::from(error_response.body)).unwrap_or_else(
-                            |_| {
+                        return builder
+                            .body(Body::from(error_response.body))
+                            .unwrap_or_else(|_| {
                                 (StatusCode::INTERNAL_SERVER_ERROR, "Response build error")
                                     .into_response()
-                            },
-                        );
+                            });
                     }
 
                     return (StatusCode::INTERNAL_SERVER_ERROR, "Handler error").into_response();
@@ -732,7 +740,11 @@ impl ProxyState {
             self.proxy_to_upstream(&req_ctx, service, &compiled_route, start)
                 .await
         } else {
-            (StatusCode::NOT_IMPLEMENTED, "No service or handler configured").into_response()
+            (
+                StatusCode::NOT_IMPLEMENTED,
+                "No service or handler configured",
+            )
+                .into_response()
         }
     }
 
@@ -879,15 +891,16 @@ impl ProxyState {
                 let elapsed = start.elapsed();
                 debug!(
                     "{} {} -> {} {} ({}ms)",
-                    req_ctx.method, req_ctx.path, full_url, status,
+                    req_ctx.method,
+                    req_ctx.path,
+                    full_url,
+                    status,
                     elapsed.as_millis()
                 );
 
-                builder
-                    .body(Body::from(final_body))
-                    .unwrap_or_else(|_| {
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
-                    })
+                builder.body(Body::from(final_body)).unwrap_or_else(|_| {
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
+                })
             }
             Err(e) => {
                 error!("Upstream request failed: {}", e);
@@ -920,15 +933,18 @@ impl ProxyState {
             }
         }
     }
-    
+
     /// Get all documents for a namespace (for module access)
-    /// 
+    ///
     /// Respects collection visibility:
     /// - Loads all documents from collections in the requesting namespace
     /// - Also loads documents from PUBLIC collections in other namespaces
-    async fn get_documents_for_namespace(&self, namespace: &str) -> std::collections::HashMap<String, serde_json::Value> {
+    async fn get_documents_for_namespace(
+        &self,
+        namespace: &str,
+    ) -> std::collections::HashMap<String, serde_json::Value> {
         let mut docs = std::collections::HashMap::new();
-        
+
         // Get all collections across all namespaces and filter by accessibility
         if let Ok(all_collections) = self.store.list_all_collections() {
             for collection in all_collections.iter() {
@@ -936,8 +952,11 @@ impl ProxyState {
                 if !collection.is_accessible_from(namespace) {
                     continue;
                 }
-                
-                if let Ok(documents) = self.store.list_documents(&collection.namespace, &collection.name) {
+
+                if let Ok(documents) = self
+                    .store
+                    .list_documents(&collection.namespace, &collection.name)
+                {
                     for doc in documents {
                         // For collections in other namespaces, prefix with namespace to avoid collisions
                         let key = if collection.namespace == namespace {
@@ -951,17 +970,21 @@ impl ProxyState {
                 }
             }
         }
-        
+
         docs
     }
-    
+
     /// Save documents that were modified by a module
-    /// 
+    ///
     /// Respects collection visibility:
     /// - Modules can only write to collections they have access to
     /// - Private collections: only writable from the same namespace
     /// - Public collections: writable from any namespace
-    async fn save_module_documents(&self, namespace: &str, documents: &std::collections::HashMap<String, serde_json::Value>) {
+    async fn save_module_documents(
+        &self,
+        namespace: &str,
+        documents: &std::collections::HashMap<String, serde_json::Value>,
+    ) {
         for (key, value) in documents {
             // Parse the key - can be "collection:id" or "namespace/collection:id" for cross-namespace
             let (target_namespace, collection, id) = if key.contains('/') {
@@ -978,19 +1001,24 @@ impl ProxyState {
             } else {
                 // Local format: "collection:id"
                 if let Some((collection, id)) = key.split_once(':') {
-                    (namespace.to_string(), collection.to_string(), id.to_string())
+                    (
+                        namespace.to_string(),
+                        collection.to_string(),
+                        id.to_string(),
+                    )
                 } else {
                     continue;
                 }
             };
 
             // Check visibility before saving
-            let can_write = if let Ok(Some(col)) = self.store.get_collection(&target_namespace, &collection) {
-                col.is_accessible_from(namespace)
-            } else {
-                // Collection doesn't exist - only allow creating in own namespace
-                target_namespace == namespace
-            };
+            let can_write =
+                if let Ok(Some(col)) = self.store.get_collection(&target_namespace, &collection) {
+                    col.is_accessible_from(namespace)
+                } else {
+                    // Collection doesn't exist - only allow creating in own namespace
+                    target_namespace == namespace
+                };
 
             if !can_write {
                 warn!(
@@ -1008,9 +1036,12 @@ impl ProxyState {
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
             };
-            
+
             if let Err(e) = self.store.set_document(&doc) {
-                error!("Failed to save document {}:{}: {}", doc.collection, doc.id, e);
+                error!(
+                    "Failed to save document {}:{}: {}",
+                    doc.collection, doc.id, e
+                );
             }
         }
     }

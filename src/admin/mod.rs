@@ -155,7 +155,10 @@ pub fn create_router(state: AdminState) -> Router {
                 .route("/document", get(list_documents))
                 .route("/document/{namespace}/{collection}/{id}", get(get_document))
                 .route("/document/{namespace}/{collection}/{id}", put(put_document))
-                .route("/document/{namespace}/{collection}/{id}", delete(delete_document))
+                .route(
+                    "/document/{namespace}/{collection}/{id}",
+                    delete(delete_document),
+                )
                 // Change logs
                 .route("/changelog", get(list_changelogs)),
         )

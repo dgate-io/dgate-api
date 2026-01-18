@@ -9,15 +9,13 @@ repository = "https://github.com/dgate-io/dgate"
 homepage = "https://github.com/dgate-io/dgate"
 documentation = "https://docs.rs/dgate"
 readme = "README.md"
-keywords = ["api-gateway", "proxy", "javascript", "modules", "kv-storage", "tls", "reverse-proxy"]
+keywords = ["api-gateway", "proxy", "javascript", "kv-storage", "reverse-proxy"]
 categories = ["web-programming", "network-programming"]
-exclude = [
-    "functional-tests/",
-    "perf-tests/",
-    "target/",
-    "modules/",
-    "*.yaml",
-    "proxy-results.json",
+include = [
+    "src/",
+    "config.dgate.yaml",
+    "README.md",
+    "LICENSE",
 ]
 
 # Main binaries to install

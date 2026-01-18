@@ -267,7 +267,11 @@ impl AdminClient {
         let url = format!("{}{}", self.base_url, path);
         if self.verbose {
             eprintln!("{} PUT {}", "→".blue(), url);
-            eprintln!("{} {}", "→".blue(), serde_json::to_string_pretty(&body).unwrap());
+            eprintln!(
+                "{} {}",
+                "→".blue(),
+                serde_json::to_string_pretty(&body).unwrap()
+            );
         }
 
         let response = self
@@ -319,7 +323,11 @@ impl AdminClient {
                     return Err(error.to_string());
                 }
             }
-            Err(format!("Request failed with status {}: {}", status.as_u16(), body))
+            Err(format!(
+                "Request failed with status {}: {}",
+                status.as_u16(),
+                body
+            ))
         }
     }
 }
@@ -331,7 +339,10 @@ fn parse_props(props: &[String]) -> Result<Value, String> {
     for prop in props {
         let parts: Vec<&str> = prop.splitn(2, '=').collect();
         if parts.len() != 2 {
-            return Err(format!("Invalid property format: '{}'. Expected key=value", prop));
+            return Err(format!(
+                "Invalid property format: '{}'. Expected key=value",
+                prop
+            ));
         }
 
         let key = parts[0];
@@ -406,23 +417,26 @@ fn print_output(data: &Value, format: OutputFormat) {
                             .and_then(|v| v.as_str())
                             .unwrap_or("-")
                             .to_string();
-                        
+
                         // Build details from other fields
                         let mut details = Vec::new();
                         if let Some(urls) = item.get("urls").and_then(|v| v.as_array()) {
                             details.push(format!("urls: {}", urls.len()));
                         }
                         if let Some(paths) = item.get("paths").and_then(|v| v.as_array()) {
-                            let paths_str: Vec<&str> = paths.iter().filter_map(|p| p.as_str()).collect();
+                            let paths_str: Vec<&str> =
+                                paths.iter().filter_map(|p| p.as_str()).collect();
                             details.push(format!("paths: [{}]", paths_str.join(", ")));
                         }
                         if let Some(patterns) = item.get("patterns").and_then(|v| v.as_array()) {
-                            let patterns_str: Vec<&str> = patterns.iter().filter_map(|p| p.as_str()).collect();
+                            let patterns_str: Vec<&str> =
+                                patterns.iter().filter_map(|p| p.as_str()).collect();
                             details.push(format!("patterns: [{}]", patterns_str.join(", ")));
                         }
                         if let Some(tags) = item.get("tags").and_then(|v| v.as_array()) {
                             if !tags.is_empty() {
-                                let tags_str: Vec<&str> = tags.iter().filter_map(|t| t.as_str()).collect();
+                                let tags_str: Vec<&str> =
+                                    tags.iter().filter_map(|t| t.as_str()).collect();
                                 details.push(format!("tags: [{}]", tags_str.join(", ")));
                             }
                         }
@@ -457,7 +471,7 @@ fn print_output(data: &Value, format: OutputFormat) {
 fn rpassword_prompt(prompt: &str) -> String {
     eprint!("{}", prompt);
     io::stderr().flush().unwrap();
-    
+
     // Simple password reading (for production, use rpassword crate)
     let mut password = String::new();
     io::stdin().read_line(&mut password).unwrap();
@@ -470,13 +484,25 @@ async fn main() {
     let client = AdminClient::new(&cli.admin, cli.auth.clone(), cli.follow, cli.verbose);
 
     let result = match &cli.command {
-        Commands::Namespace(args) => handle_resource(&client, "namespace", &args.action, cli.output).await,
-        Commands::Service(args) => handle_resource(&client, "service", &args.action, cli.output).await,
-        Commands::Module(args) => handle_resource(&client, "module", &args.action, cli.output).await,
+        Commands::Namespace(args) => {
+            handle_resource(&client, "namespace", &args.action, cli.output).await
+        }
+        Commands::Service(args) => {
+            handle_resource(&client, "service", &args.action, cli.output).await
+        }
+        Commands::Module(args) => {
+            handle_resource(&client, "module", &args.action, cli.output).await
+        }
         Commands::Route(args) => handle_resource(&client, "route", &args.action, cli.output).await,
-        Commands::Domain(args) => handle_resource(&client, "domain", &args.action, cli.output).await,
-        Commands::Collection(args) => handle_resource(&client, "collection", &args.action, cli.output).await,
-        Commands::Secret(args) => handle_resource(&client, "secret", &args.action, cli.output).await,
+        Commands::Domain(args) => {
+            handle_resource(&client, "domain", &args.action, cli.output).await
+        }
+        Commands::Collection(args) => {
+            handle_resource(&client, "collection", &args.action, cli.output).await
+        }
+        Commands::Secret(args) => {
+            handle_resource(&client, "secret", &args.action, cli.output).await
+        }
         Commands::Document(args) => handle_document(&client, &args.action, cli.output).await,
     };
 
@@ -498,25 +524,27 @@ async fn handle_resource(
     match action {
         ResourceAction::Create { props } => {
             let body = parse_props(props)?;
-            
+
             // Get name from body
-            let name = body.get("name")
+            let name = body
+                .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or("name is required")?
                 .to_string();
-            
+
             // Build path based on resource type
             let path = if is_namespace {
                 format!("/api/v1/{}/{}", resource_type, name)
             } else {
-                let namespace = body.get("namespace")
+                let namespace = body
+                    .get("namespace")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
                 format!("/api/v1/{}/{}/{}", resource_type, namespace, name)
             };
-            
+
             let result = client.put(&path, body).await?;
-            
+
             if let Some(data) = result.get("data") {
                 println!("{} {} created successfully", resource_type.green(), name);
                 print_output(data, output);
@@ -532,7 +560,7 @@ async fn handle_resource(
                 let ns = namespace.as_deref().unwrap_or("default");
                 format!("/api/v1/{}/{}/{}", resource_type, ns, name)
             };
-            
+
             client.delete(&path).await?;
             println!("{} {} deleted successfully", resource_type.green(), name);
             Ok(())
@@ -543,7 +571,7 @@ async fn handle_resource(
             } else {
                 format!("/api/v1/{}", resource_type)
             };
-            
+
             let result = client.get(&path).await?;
             if let Some(data) = result.get("data") {
                 print_output(data, output);
@@ -557,7 +585,7 @@ async fn handle_resource(
                 let ns = namespace.as_deref().unwrap_or("default");
                 format!("/api/v1/{}/{}/{}", resource_type, ns, name)
             };
-            
+
             let result = client.get(&path).await?;
             if let Some(data) = result.get("data") {
                 print_output(data, output);
@@ -575,22 +603,25 @@ async fn handle_document(
     match action {
         DocumentAction::Create { props } => {
             let body = parse_props(props)?;
-            
-            let namespace = body.get("namespace")
+
+            let namespace = body
+                .get("namespace")
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
-            let collection = body.get("collection")
+            let collection = body
+                .get("collection")
                 .and_then(|v| v.as_str())
                 .ok_or("collection is required")?;
-            let id = body.get("id")
+            let id = body
+                .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or("id is required")?;
-            
+
             let path = format!("/api/v1/collection/{}/{}/{}", namespace, collection, id);
-            
+
             // Get the data field or use the whole body
             let data = body.get("data").cloned().unwrap_or(body.clone());
-            
+
             let result = client.put(&path, data).await?;
             println!("{} document created successfully", "Document".green());
             if let Some(data) = result.get("data") {
@@ -598,13 +629,20 @@ async fn handle_document(
             }
             Ok(())
         }
-        DocumentAction::Delete { id, collection, namespace } => {
+        DocumentAction::Delete {
+            id,
+            collection,
+            namespace,
+        } => {
             let path = format!("/api/v1/collection/{}/{}/{}", namespace, collection, id);
             client.delete(&path).await?;
             println!("{} {} deleted successfully", "Document".green(), id);
             Ok(())
         }
-        DocumentAction::List { collection, namespace } => {
+        DocumentAction::List {
+            collection,
+            namespace,
+        } => {
             let path = format!("/api/v1/collection/{}/{}", namespace, collection);
             let result = client.get(&path).await?;
             if let Some(data) = result.get("data") {
@@ -612,7 +650,11 @@ async fn handle_document(
             }
             Ok(())
         }
-        DocumentAction::Get { id, collection, namespace } => {
+        DocumentAction::Get {
+            id,
+            collection,
+            namespace,
+        } => {
             let path = format!("/api/v1/collection/{}/{}/{}", namespace, collection, id);
             let result = client.get(&path).await?;
             if let Some(data) = result.get("data") {

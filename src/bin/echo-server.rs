@@ -21,7 +21,7 @@ static REQUEST_COUNT: AtomicU64 = AtomicU64::new(0);
 
 async fn echo(_req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
     let count = REQUEST_COUNT.fetch_add(1, Ordering::Relaxed);
-    
+
     // Super minimal response for maximum speed
     let body = format!(r#"{{"ok":true,"n":{}}}"#, count);
 
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     let conn = http1::Builder::new()
                         .keep_alive(true)
                         .serve_connection(io, service_fn(echo));
-                    
+
                     if let Err(err) = conn.await {
                         // Only log if it's not a normal connection close
                         if !err.is_incomplete_message() {

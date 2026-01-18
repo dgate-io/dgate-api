@@ -469,7 +469,7 @@ mod tests {
     #[test]
     fn test_collection_visibility_private() {
         let col = Collection::new("users", "namespace-a");
-        
+
         // Private collection should only be accessible from same namespace
         assert!(col.is_accessible_from("namespace-a"));
         assert!(!col.is_accessible_from("namespace-b"));
@@ -480,7 +480,7 @@ mod tests {
     fn test_collection_visibility_public() {
         let mut col = Collection::new("shared-data", "namespace-a");
         col.visibility = CollectionVisibility::Public;
-        
+
         // Public collection should be accessible from any namespace
         assert!(col.is_accessible_from("namespace-a"));
         assert!(col.is_accessible_from("namespace-b"));

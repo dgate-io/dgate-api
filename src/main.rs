@@ -11,12 +11,7 @@ mod resources;
 mod storage;
 
 use axum::{
-    body::Body,
-    extract::Request,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::any,
-    Router,
+    body::Body, extract::Request, http::StatusCode, response::IntoResponse, routing::any, Router,
 };
 use clap::Parser;
 use std::net::SocketAddr;
@@ -120,9 +115,7 @@ async fn main() -> anyhow::Result<()> {
     let proxy_router = Router::new()
         .route(
             "/{*path}",
-            any(move |req: Request| async move {
-                proxy_state_clone.handle_request(req).await
-            }),
+            any(move |req: Request| async move { proxy_state_clone.handle_request(req).await }),
         )
         .route(
             "/",
@@ -164,8 +157,7 @@ fn setup_logging(config: &DGateConfig) {
         _ => Level::INFO,
     };
 
-    let filter = EnvFilter::from_default_env()
-        .add_directive(log_level.into());
+    let filter = EnvFilter::from_default_env().add_directive(log_level.into());
 
     if config.log_json {
         tracing_subscriber::registry()

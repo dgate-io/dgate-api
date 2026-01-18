@@ -54,7 +54,10 @@ impl MemoryStorage {
         }
     }
 
-    fn get_table(&self, table: &str) -> dashmap::mapref::one::RefMut<String, DashMap<String, Vec<u8>>> {
+    fn get_table(
+        &self,
+        table: &str,
+    ) -> dashmap::mapref::one::RefMut<String, DashMap<String, Vec<u8>>> {
         self.tables
             .entry(table.to_string())
             .or_insert_with(DashMap::new)
@@ -509,7 +512,11 @@ impl ProxyStore {
         self.storage.delete(TBL_DOCUMENTS, &key)
     }
 
-    pub fn list_documents(&self, namespace: &str, collection: &str) -> StorageResult<Vec<Document>> {
+    pub fn list_documents(
+        &self,
+        namespace: &str,
+        collection: &str,
+    ) -> StorageResult<Vec<Document>> {
         let prefix = format!("{}:{}:", namespace, collection);
         self.list_typed(TBL_DOCUMENTS, &prefix)
     }
