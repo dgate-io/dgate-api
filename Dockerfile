@@ -1,6 +1,6 @@
 # DGate API Gateway - Multi-stage Dockerfile
 # Build stage for Rust compilation
-FROM rust:1.75-bookworm AS builder
+FROM rust:1.92-bookworm AS builder
 
 WORKDIR /app
 
