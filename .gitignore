@@ -3,3 +3,5 @@ target/
 .dgate/
 .lego/
 .vscode/
+
+node_modules
