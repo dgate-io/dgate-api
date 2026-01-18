@@ -618,6 +618,9 @@ pub struct ClusterMember {
     /// Admin API port for internal replication (optional, defaults to deriving from addr)
     #[serde(default)]
     pub admin_port: Option<u16>,
+    /// Whether to use TLS/HTTPS for internal replication (default: false)
+    #[serde(default)]
+    pub tls: bool,
 }
 
 /// Node discovery configuration

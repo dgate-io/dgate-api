@@ -34,13 +34,15 @@ pub struct ClientResponse {
     pub message: Option<String>,
 }
 
-/// Snapshot data for state machine
+/// Snapshot data for state machine (used for Raft snapshots)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SnapshotData {
     pub changelogs: Vec<ChangeLog>,
 }
 
-/// Raft type configuration placeholder
+/// Raft type configuration placeholder (for future openraft integration)
+#[allow(dead_code)]
 pub struct TypeConfig;
 
 /// The Raft instance type - placeholder for now
@@ -59,10 +61,17 @@ impl DGateRaft {
         }
     }
 
+    /// Get this node's ID
+    pub fn node_id(&self) -> NodeId {
+        self.node_id
+    }
+
     pub async fn current_leader(&self) -> Option<NodeId> {
         *self.leader_id.read().await
     }
 
+    /// Handle a vote request (Raft protocol - for future use)
+    #[allow(dead_code)]
     pub async fn vote(
         &self,
         _req: serde_json::Value,
@@ -70,6 +79,8 @@ impl DGateRaft {
         Ok(serde_json::json!({"vote_granted": true}))
     }
 
+    /// Handle append entries request (Raft protocol - for future use)
+    #[allow(dead_code)]
     pub async fn append_entries(
         &self,
         _req: serde_json::Value,
@@ -77,6 +88,8 @@ impl DGateRaft {
         Ok(serde_json::json!({"success": true}))
     }
 
+    /// Handle install snapshot request (Raft protocol - for future use)
+    #[allow(dead_code)]
     pub async fn install_snapshot(
         &self,
         _req: serde_json::Value,
@@ -92,7 +105,8 @@ pub struct DGateStateMachine {
 }
 
 impl DGateStateMachine {
-    /// Create a new state machine
+    /// Create a new state machine (without change notifications)
+    #[allow(dead_code)]
     pub fn new(store: Arc<ProxyStore>) -> Self {
         Self {
             store,
@@ -398,7 +412,7 @@ impl ClusterManager {
 
     /// Replicate a changelog to all peer nodes
     async fn replicate_to_peers(&self, changelog: &ChangeLog) {
-        let my_node_id = self.config.node_id;
+        let my_node_id = self.raft.node_id();
 
         for member in &self.config.initial_members {
             // Skip self
@@ -442,25 +456,27 @@ impl ClusterManager {
 
     /// Get the admin API URL for a cluster member
     fn get_member_admin_url(&self, member: &ClusterMember) -> String {
+        let scheme = if member.tls { "https" } else { "http" };
+
         // If admin_port is specified, use it
         if let Some(admin_port) = member.admin_port {
             // Extract host from addr (format: host:port)
             let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
-            return format!("http://{}:{}", host, admin_port);
+            return format!("{}://{}:{}", scheme, host, admin_port);
         }
 
         // Otherwise, derive admin port from raft port (admin = raft - 10)
         // This is a convention used in the test configuration
-        if let Some(port_str) = member.addr.split(':').last() {
+        if let Some(port_str) = member.addr.split(':').next_back() {
             if let Ok(raft_port) = port_str.parse::<u16>() {
                 let admin_port = raft_port.saturating_sub(10);
                 let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
-                return format!("http://{}:{}", host, admin_port);
+                return format!("{}://{}:{}", scheme, host, admin_port);
             }
         }
 
         // Fallback: use addr as-is (might not work)
-        format!("http://{}", member.addr)
+        format!("{}://{}", scheme, member.addr)
     }
 
     /// Apply a replicated changelog (from another node)
@@ -476,7 +492,7 @@ impl ClusterManager {
     /// Get cluster metrics
     pub async fn metrics(&self) -> ClusterMetrics {
         ClusterMetrics {
-            id: self.config.node_id,
+            id: self.raft.node_id(),
             current_term: Some(1),
             last_applied: Some(0),
             committed: Some(0),
@@ -484,12 +500,14 @@ impl ClusterManager {
         }
     }
 
-    /// Get cluster members
+    /// Get cluster members (public API for external use)
+    #[allow(dead_code)]
     pub fn members(&self) -> &[ClusterMember] {
         &self.config.initial_members
     }
 
-    /// Get the Raft instance for admin operations
+    /// Get the Raft instance for admin operations (public API for external use)
+    #[allow(dead_code)]
     pub fn raft(&self) -> &Arc<DGateRaft> {
         &self.raft
     }
@@ -511,7 +529,8 @@ impl ClusterManager {
     }
 }
 
-/// Cluster error types
+/// Cluster error types (public API for error handling)
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ClusterError {
     #[error("Not leader, current leader is: {0:?}")]

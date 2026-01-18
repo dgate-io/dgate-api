@@ -107,15 +107,16 @@ impl NodeDiscovery {
             // Update known nodes
             let mut known = self.known_nodes.write().await;
             for (node_id, node) in discovered {
-                if !known.contains_key(&node_id) {
+                if let std::collections::btree_map::Entry::Vacant(e) = known.entry(node_id) {
                     info!("Discovered new node: {} at {}", node_id, node.addr);
-                    known.insert(node_id, node);
+                    e.insert(node);
                 }
             }
         }
     }
 
-    /// Get currently known nodes
+    /// Get currently known nodes (public API for external use)
+    #[allow(dead_code)]
     pub async fn known_nodes(&self) -> BTreeMap<NodeId, BasicNode> {
         self.known_nodes.read().await.clone()
     }
