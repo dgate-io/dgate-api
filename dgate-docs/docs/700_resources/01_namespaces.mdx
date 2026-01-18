@@ -1,0 +1,32 @@
+---
+id: namespaces
+title: Namespaces
+icon: img/icons/namespaces.svg
+---
+
+Namespaces are a way to organize your resources in DGate. They are used to group resources together and provide a way to manage access control and policies for those resources.
+
+Each resource in DGate belongs to a namespace (except [Documents](/docs/resources/documents)). Resource that are not in the same namespace cannot be accessed by each other.
+
+Each resource that has a namespace also has tags, namespaces also have tags.
+
+At the moment, tags don't have much functionality, but they may be used in the future for permissions, canary, server tag based resource management, etc.
+
+## Namespace Structure
+
+```json
+{
+    "name": "namespace1",
+    "tags": ["tag1", "tag2"],
+}
+```
+
+## Namespace Fields
+
+### `name!`
+
+The name of the namespace.
+
+### `tags`
+
+The tags associated with the namespace. Read more about tags [here](/docs/concepts/tags).

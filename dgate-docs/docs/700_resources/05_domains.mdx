@@ -1,0 +1,50 @@
+---
+id: domains
+title: Domains
+---
+
+Domains are way are a way to control ingress traffic into specific namespaces in DGate.
+
+## Domain Structure
+
+```json
+{
+    "name": "domain1",
+    "namespace": "namespace1",
+    "patterns": ["/route1"],
+    "priority": 1,
+    "cert": "cert1",
+    "key": "key1",
+    "tags": ["tag1", "tag2"],
+}
+```
+
+## Domain Fields
+
+### `name!`
+
+The name of the domain.
+
+### `namespace`
+
+The namespace that the domain belongs to.
+
+### `patterns!`
+
+Pattern that the domain should match. Read more about [domain patterns](/docs/concepts/domain_patterns).
+
+### `priority`
+
+The priority of the domain. Domains with higher priority will be matched first.
+
+### `cert`
+
+The certificate to use for the domain.
+
+### `key`
+
+The private key to use for the domain.
+
+### `tags`
+
+The tags associated with the domain. Read me about tags [here](/docs/concepts/tags).

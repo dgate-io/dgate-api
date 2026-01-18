@@ -1,0 +1,156 @@
+---
+id: dgate-cli
+title: DGate CLI
+description: dgate-cli guide for installing, usage and examples.
+---
+
+__*dgate-cli*__ is a command line interface for the DGate Admin API. This document provides an overview of its usage, commands, and options.
+
+## Installation
+
+To install DGate CLI, you can use the following command:
+
+```bash
+go install github.com/dgate-io/dgate/cmd/dgate-cli@latest
+dgate-cli --help
+```
+### Using Docker
+
+```bash
+docker pull ghcr.io/dgate-io/dgate:latest
+docker run -it --rm ghcr.io/dgate-io/dgate dgate-cli --help
+```
+
+import GithubReleaseFetcher from '@site/src/components/GithubReleaseFetcher';
+
+<GithubReleaseFetcher>
+### Binary Releases (Linux, MacOS, Windows)
+</GithubReleaseFetcher>
+
+## Usage
+
+```sh
+dgate-cli [global options] command [command options]
+```
+
+## Global Options
+
+| Option                      | Description                                                                  | Default                          | Environment Variable       |
+|-----------------------------|------------------------------------------------------------------------------|----------------------------------|----------------------------|
+| `--admin value`             | The URL for the file client                                                  | `http://localhost:9080`          | `DGATE_ADMIN_API`          |
+| `--auth value`, `-a value`  | Basic auth username:password; or just username for password prompt           |                                  | `DGATE_ADMIN_AUTH`         |
+| `--follow`, `-f`            | Follows redirects, useful for raft leader changes                            | `false`                          | `DGATE_FOLLOW_REDIRECTS`   |
+| `--verbose`, `-V`           | Enable verbose logging                                                       | `false`                          |                            |
+| `--help`, `-h`              | Show help                                                                    |                                  |                            |
+| `--version`, `-v`           | Print the version                                                            |                                  |                            |
+
+## Commands
+
+| Command                   | Alias  | Description                                    |
+|---------------------------|--------|------------------------------------------------|
+| `namespace`               | `ns`   | Namespace management commands                  |
+| `service`                 | `svc`  | Service management commands                    |
+| `module`                  | `mod`  | Module management commands                     |
+| `route`                   | `rt`   | Route management commands                      |
+| `domain`                  | `dom`  | Domain management commands                     |
+| `collection`              | `col`  | Collection management commands                 |
+| `document`                | `doc`  | Document management commands                   |
+| `secret`                  | `sec`  | Secret management commands                     |
+| `help`                    | `h`    | Shows a list of commands or help for one command|
+
+## Resource Commands
+
+The following subcommands are available for all resources (namespace, domain, service, module, route, collection, document, secret).
+
+### Usage
+
+```sh
+dgate-cli <resource> command [command options] <command> <name>
+```
+
+### Subcommands
+
+| Subcommand   | Alias  | Description            |
+|--------------|--------|------------------------|
+| `create`     | `mk`   | Create a resource      |
+| `delete`     | `rm`   | Delete a resource      |
+| `list`       | `ls`   | List resources         |
+| `get`        |        | Get a resource         |
+| `help`       | `h`    | Shows help for commands|
+
+### Options
+
+| Option        | Description  |
+|---------------|--------------|
+| `--help`, `-h`| Show help    |
+
+## Examples
+
+### Creating a Resource
+
+```sh
+dgate-cli namespace create name=my-namespace
+dgate-cli domain create name=my-domain 
+dgate-cli service create name=my-service
+dgate-cli module create name=my-module
+dgate-cli route create name=my-route
+dgate-cli collection create name=my-collection
+dgate-cli document create name=my-document
+dgate-cli secret create name=my-secret
+```
+
+### Deleting a Resource
+
+```sh
+dgate-cli namespace delete my-namespace
+dgate-cli domain delete my-domain
+dgate-cli service delete my-service
+dgate-cli module delete my-module
+dgate-cli route delete my-route
+dgate-cli collection delete my-collection
+dgate-cli document delete my-document
+dgate-cli secret delete my-secret
+```
+
+### Listing Resources
+
+```sh
+dgate-cli namespace list
+dgate-cli domain list
+dgate-cli service list
+dgate-cli module list
+dgate-cli route list
+dgate-cli collection list
+dgate-cli document list
+dgate-cli secret list
+```
+
+### Fetching a Resource
+
+```sh
+dgate-cli namespace get name=my-namespace
+dgate-cli domain get name=my-domain
+dgate-cli service get name=my-service
+dgate-cli module get name=my-module
+dgate-cli route get name=my-route
+dgate-cli collection get name=my-collection
+dgate-cli document get name=my-document
+dgate-cli secret get name=my-secret
+```
+
+For more information on a specific command, use the `help` subcommand with the desired command.
+
+```sh
+dgate-cli namespace help create
+dgate-cli domain help create
+dgate-cli service help create
+dgate-cli module help create
+dgate-cli route help create
+dgate-cli collection help create
+dgate-cli document help create
+dgate-cli secret help create
+```
+
+import DocCardList from '@theme/DocCardList';
+
+{/* <DocCardList /> */}

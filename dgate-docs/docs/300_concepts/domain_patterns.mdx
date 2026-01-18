@@ -1,0 +1,31 @@
+---
+id: domain_patterns
+title: Domain Patterns
+---
+
+Domain Patterns are used in a few places in DGate ([Domain Resources](/docs/resources/domains#patterns) and [Proxy Config Allowed Domains](/docs/getting-started/dgate-server#proxy-config)) to match domain patterns (or IP patterns).
+
+## Pattern Types
+
+### Direct matching
+
+Direct matching is the simplest form of pattern matching. The domain must match the pattern exactly.
+
+### Wildcards
+
+Wildcards are used to match multiple paths. The wildcard character is `*`.
+
+Wildcards can be used in a few ways:
+
+- `*` - matches any path
+- `*foo` - matches any path that ends with `foo`
+- `foo*` - matches any path that starts with `foo`
+- `*foo*` - matches any path that contains `foo`
+
+### Regular Expressions
+
+Regular expressions can be used to match specific patterns. The pattern must be enclosed in `/`.
+
+- `/^.+\.example.com$/` - matches any subdomain of `example.com`
+- `/^example\.com$/` - matches `example.com` exactly
+

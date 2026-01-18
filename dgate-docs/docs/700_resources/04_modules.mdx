@@ -1,0 +1,113 @@
+---
+id: modules
+title: Modules
+tags: [javascript, typescript]
+---
+
+Modules are used to extend the functionality of DGate. They are used to modify requests and responses, handle errors, and more. Modules are executed in a specific order, and each module has access to the context of the request and response.
+
+
+## Module Structure 
+
+```json
+{
+    "name": "module1",
+    "namespace": "namespace1",
+    "payload": "const fetchUpstream = console.debug",
+    "type": "typescript",
+    "tags": ["tag1", "tag2"]
+}
+```
+
+## Module Fields
+
+### `name!`
+
+The name of the module.
+
+### `namespace`
+
+The namespace that the module belongs to.
+
+### `payload`
+
+The code that the module will execute. (base64 encoded)
+
+### `type`
+
+The type of the module. (`typescript` or `javascript`)
+
+### `tags`
+
+The tags associated with the module. Read me about tags [here](/docs/concepts/tags).
+
+## Module Functions
+
+Currently, DGate supports the following modules:
+- ### Fetch Upstream Module \{#fetchUpstream} 
+  - `fetchUpstream` is executed before the proxy request is sent to the upstream server. This module is used to decide which upstream server URL.
+
+- ### Request Modifier Module \{#requestModifier} 
+  - `requestModifier` is executed before the request is sent to the upstream server. This module is used to modify the request before it is sent to the upstream server.
+
+- ### Response Modifier Module \{#responseModifier} 
+  - `responseModifier` is executed after the response is received from the upstream server. This module is used to modify the response before it is sent to the client.
+
+- ### Error Handler Module \{#errorHandler} 
+  - `errorHandler` is executed when an error occurs when sending a request to the upstream server. This module is used to modify the response before it is sent to the client.
+
+- ### Request Handler Module \{#requestHandler} 
+  - `requestHandler` is executed when a request is received from the client. This module is used to handle arbitrary requests, instead of using an upstream service.
+
+## Exposing Functions
+
+To ensure that your module is triggered, you need to export or define the function name in the _first_ module in the route configuration.
+
+```typescript
+export const fetchUpstream = async (ctx: ModuleContext) => {
+  // Your code here
+}
+const requestModifier = async (ctx: ModuleContext) => {
+  // Your code here
+}
+```
+
+In the code above, both `fetchUpstream` and `requestModifier` are defined in the same module. Even though `requestModifier` is not exported, it will still be triggered when the module is executed.
+
+
+## Multiple Modules
+
+Modules can be imported and used in other modules. However, only the functions defined or export in the _first_ module in the route configuration will be triggered.
+
+```typescript title="main.ts"
+import { requestModifier as reqMod } from './custom'
+export { fetchUpstream } from './custom'
+const requestModifier = async (ctx: ModuleContext) => {
+    console.info("id", ctx.id, JSON.stringify(ctx));
+    return reqMod(ctx);
+}
+```
+
+```typescript title="custom.ts"
+export const fetchUpstream = async (ctx: ModuleContext) => {
+  // Your code here
+}
+
+export const requestModifier = async (ctx: ModuleContext) => {
+  // Your code here
+}
+
+export const responseModifier = async (ctx: ModuleContext) => {
+  // Your code here
+}
+```
+
+```json title="Route Config"
+{
+    "path": "/",
+    "method": "GET",
+    "modules": ["main", "custom"]
+}
+```
+
+In the code above, because main is the first module in the route configuration, only the `fetchUpstream` and `requestModifier` functions will be triggered. The `responseModifier` function will not be triggered because it is exported to the `main` module.

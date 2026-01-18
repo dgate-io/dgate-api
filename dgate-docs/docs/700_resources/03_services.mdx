@@ -1,0 +1,76 @@
+---
+id: services
+title: Services
+---
+
+Services are an abstraction of upstream services. They are used to define the connection details and settings for the upstream service.
+
+## Service Structure
+
+```json
+{
+    "name": "service1",
+    "urls": ["http://example.com/v1", "http://example.net/v1"],
+    "namespace": "namespace1",
+    "retries": 3,
+    "retryTimeout": "5s",
+    "connectTimeout": "1s",
+    "requestTimeout": "5s",
+    "tlsSkipVerify": false,
+    "http2Only": false,
+    "hideDGateHeaders": false,
+    "disableQueryParams": false,
+    "tags": ["tag1", "tag2"]
+}
+```
+
+## Service Fields
+
+### `name!`
+
+The name of the service.
+
+### `urls!`
+
+The URLs of the upstream service. Multiple URLs can be provided to allow for load balancing and failover.
+
+### `namespace`
+
+The namespace that the service belongs to.
+
+### `retries`
+
+The number of times to retry a request to the upstream service if it fails. Default is `3`.
+
+### `retryTimeout`
+
+The time to wait before retrying a request to the upstream service. Default is `5s`.
+
+### `connectTimeout`
+
+The time to wait before timing out a connection to the upstream service. Default is `1s`.
+
+### `requestTimeout`
+
+The time to wait before timing out a request to the upstream service. Default is `5s`.
+
+### `tlsSkipVerify`
+
+If `true`, DGate will skip verifying the TLS certificate of the upstream service. Default is `false`.
+
+### `http2Only`
+
+If `true`, DGate will only use HTTP/2 to communicate with the upstream service. Default is `false`.
+
+### `hideDGateHeaders`
+
+If `true`, DGate will not send its headers to the upstream service. Default is `false`.
+
+### `disableQueryParams`
+
+If `true`, DGate will not forward query parameters to the upstream service. Default is `false`.
+
+### `tags`
+
+Tags that the service belongs to. Tags can be used for access control, canary, etc. Read me about tags [here](/docs/concepts/tags).
+

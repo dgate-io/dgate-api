@@ -1,0 +1,37 @@
+---
+id: functions
+title: Functions
+---
+
+## Native Modules
+
+### `dgate/http`
+
+- `fetch` - 
+
+### `dgate/state` - 
+
+### `dgate/storage` - 
+
+### `dgate/util` - 
+
+### `dgate/exp` - 
+
+### `dgate/cypto` - 
+
+## Types
+
+### `ModuleContext`
+
+```typescript
+
+type ModuleContext = {
+  request: Request;
+  response: Response;
+  // Path Parameters: (i.e. /{month}-{year} -> /01-2021 ->  -> {month: '01', year: '2021'})
+  pathParam(key: string): string;
+  pathParams(): Record<string, string>;
+};
+
+```
+

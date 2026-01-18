@@ -1,0 +1,64 @@
+---
+id: routes
+title: Routes
+---
+
+Routes are used to define how requests are handled in DGate. They are used to match incoming requests and forward them to the appropriate upstream service.
+
+## Route Structure
+
+```json
+{
+    "name": "route1",
+    "paths": ["/route1"],
+    "methods": ["GET", "POST"],
+    "preserveHost": true,
+    "stripPath": false,
+    "service": "service1",
+    "modules": ["module1", "module2"],
+    "namespace": "namespace1",
+    "tags": ["tag1", "tag2"]
+}
+```
+
+## Route Fields
+
+### `name!`
+
+The name of the route.
+
+### `paths!`
+
+Paths that the route should match. Read more about [routing patterns](/docs/concepts/routing_patterns).
+
+### `methods!`
+
+HTTP methods that the route should match. Valid methods are `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `OPTIONS`, `HEAD`, `CONNECT`, `TRACE`.
+
+### `preserveHost`
+
+If `true`, the host header will be preserved and sent to the upstream service.
+
+### `stripPath`
+
+If `true`, the path will be stripped from the request before it is sent to the upstream service.
+
+> If the path that ends with a wildcard, the path will strip the characters before the wildcard. For example, if the path is `/route/*`, the path `/route/img/icon.svg` will be stripped to `/img/icon.svg`.
+> If the service URL also includes a path, the path will be appended to the service path. For example, if the service path is `/service`, the path `/route/img/icon.svg` will be stripped to `/service/img/icon.svg`
+
+### `service`
+
+The name of the service that the route should forward the request to.
+
+### `namespace`
+
+The namespace that the route belongs to.
+
+### `modules`
+
+Modules that should be executed for the route.
+
+### `tags`
+
+Tags that can be used to filter or search for routes. Read me about tags [here](/docs/concepts/tags).
+

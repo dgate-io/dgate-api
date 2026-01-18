@@ -1,0 +1,133 @@
+---
+id: url-shortener-example
+title: URL Shortener Example
+description: URL shortener using DGate Modules.
+tags: [modules]
+---
+
+This example demonstrates how to create a URL shortener using DGate with the [Request Handler](/docs/resources/modules#requestHandler) module function.
+
+First, we need to create a namespace, domain, and collection for the URL shortener.
+
+import CodeFetcher from '@site/src/components/CodeFetcher';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Collapse from '@site/src/components/Collapse';
+
+```bash
+# Create a namespace for the URL shortener
+dgate-cli namespace create name=url_shortener-ns
+
+# Create a domain with a pattern for the URL shortener
+dgate-cli domain create \
+    name=url_shortener-dm \
+    patterns:='["url_shortener.com"]' \
+    namespace=url_shortener-ns
+
+# Create a collection for the short link documents using json schema.
+dgate-cli collection create \
+    schema:='{"type":"object","properties":{"url":{"type":"string"}}}' \
+    name=short_link type=document namespace=url_shortener-ns
+```
+
+Next, we need to create the module and route for the URL shortener. FYI, we don't need a service here, since the request will be handled in the request handler module.
+
+<Collapse title="URL Shortener Code">
+```typescript
+import { createHash } from "dgate/crypto";
+import { addDocument, getDocument } from "dgate/state";
+
+export const requestHandler = (ctx: any) => {
+    const req = ctx.request();
+    const res = ctx.response();
+    if (req.method == "GET") {
+        const pathId = ctx.pathParam("id")
+        if (!pathId) {
+            res.status(400).json({ error: "id is required" })
+            return;
+        }
+        // get the document with the ID from the collection
+        return getDocument("short_link", pathId)
+            .then((doc) => {
+                // check if the document contains the URL
+                if (!doc?.data?.url) {
+                    res.status(404).json({ error: "not found" });
+                } else {
+                    res.redirect(doc.data.url);
+                }
+            })
+            .catch((e) => {
+                console.log("error", e, JSON.stringify(e));
+                res.status(500).json({ error: e?.message });
+            });
+    } else if (req.method == "POST") {
+        const link = req.query.get("url");
+        if (!link) {
+            return res.status(400).json({ error: "url is required" });
+        }
+
+        // create a new document with the hash as the ID, and the link as the data
+        return addDocument({
+            id: hashURL(link),
+            collection: "short_link",
+            // the collection schema is defined in url_shortener_test.sh
+            data: { url: link },
+        })
+            .then(() => res.status(201).json({ id: hash }))
+            .catch((e: any) => res.status(500).json({ error: e?.message }));
+    } else {
+        return res.status(405).json({ error: "method not allowed" });
+    }
+};
+
+const hashURL = (url: string) => createHash("sha1")
+    .update(url).digest("base64rawurl").slice(-8);
+```
+</Collapse>
+
+```sh
+# Create a module for the URL shortener
+dgate-cli module create \
+    name=url_shortener-mod \
+    payload@=$DIR/url_shortener.ts \
+    namespace=url_shortener-ns
+
+# Create a route for the URL shortener
+dgate-cli route create \
+    name=url_shortener \
+    paths:='["/{id}", "/"]' \
+    methods:='["GET","POST"]' \
+    modules:='["url_shortener-mod"]' \
+    namespace=url_shortener-ns
+```
+
+<Tabs>
+<TabItem value="httpie" label="HTTPie" default>
+```sh
+# Create a short link
+http POST http://localhost:80 \
+    Host:url_shortener.com \
+    url=='https://dgate.io'
+# Output: {"id":"abc123"}
+
+# Test the short link
+http 'http://localhost:80/abc123' \
+    Host:url_shortener.com
+# Output: Redirects to https://dgate.io
+```
+</TabItem>
+<TabItem value="curl" label="cURL">
+```sh
+# Create a short link
+curl -G -X POST http://localhost:80 \
+    -H Host:url_shortener.com \
+    --data-urlencode url='https://dgate.io'
+# Output: {"id":"abc123"}
+
+# Test the short link
+curl -G 'http://localhost:80/?id={short_link_id}' \
+    -H Host:url_shortener.com
+# Output: Redirects to https://dgate.io
+```
+</TabItem>
+</Tabs>

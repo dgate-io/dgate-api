@@ -1,0 +1,9 @@
+{
+    "extends": "@docusaurus/tsconfig",
+    "include": ["src/**/*"],
+    "compilerOptions": {
+      "baseUrl": ".",
+      "module": "ESNext",
+      "lib": ["ES2015"]
+    }
+  

@@ -1,0 +1,115 @@
+# GitLab CI/CD Pipeline for dgate-docs
+# Builds and deploys Docusaurus documentation
+
+image: oven/bun:1.0.26-slim
+
+stages:
+  - lint
+  - build
+  - check
+  - deploy
+
+variables:
+  NODE_ENV: production
+
+# Cache node_modules between jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - dgate-docs/node_modules/
+
+# Shared setup for all jobs
+.setup:
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends git
+    - cd dgate-docs
+    - bun install --frozen-lockfile
+
+# TypeScript type checking
+typecheck:
+  extends: .setup
+  stage: lint
+  script:
+    - bun x tsc --noEmit
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - dgate-docs/**/*
+  allow_failure: true
+
+# Lint MDX/Markdown files
+lint:markdown:
+  extends: .setup
+  stage: lint
+  script:
+    - bun x markdownlint-cli2 "docs/**/*.{md,mdx}" --config .markdownlint.json || true
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - dgate-docs/**/*
+  allow_failure: true
+
+# Build the documentation
+build:
+  extends: .setup
+  stage: build
+  script:
+    - bun run build
+  artifacts:
+    paths:
+      - dgate-docs/build/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - dgate-docs/**/*
+
+# Check for broken internal links
+link:check:
+  stage: check
+  dependencies:
+    - build
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm
+  script:
+    - npm install -g linkinator
+    - linkinator dgate-docs/build --recurse --skip "^(?!file://)" --verbosity error
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - dgate-docs/**/*
+  allow_failure: true
+
+# Check external links (runs less frequently, can be slow)
+link:check:external:
+  stage: check
+  dependencies:
+    - build
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm
+  script:
+    - npm install -g linkinator
+    - linkinator dgate-docs/build --recurse --timeout 30000 --verbosity error
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - dgate-docs/**/*
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+  timeout: 30m
+
+# Deploy to GitLab Pages
+pages:
+  stage: deploy
+  dependencies:
+    - build
+  script:
+    - mkdir -p public
+    - cp -r dgate-docs/build/* public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - dgate-docs/**/*

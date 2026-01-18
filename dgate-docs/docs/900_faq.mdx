@@ -1,0 +1,21 @@
+---
+id: faq
+title: FAQ
+---
+
+### How can I contribute to DGate?
+
+- Creating issues or pull requests on the [DGate repository](https://github.com/dgate-io/dgate)
+
+## Is DGate compatible with Node JS or any other JS runtimes?
+
+Unfortunately, no...
+
+### Why is DGate request latency high?
+
+DGate is a proxy server that sits between a client and the upstream service(s).
+The latency could be higher than expected due to the following reasons:
+- Network latency between the client and DGate
+- Network latency between DGate and the upstream service
+- DGate Transport Settings (which can limit the number of connections, etc.)
+- DGate Modules (having unoptimized or too many modules can increase latency)

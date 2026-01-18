@@ -1,0 +1,56 @@
+---
+id: routing_patterns
+title: Routing Patterns
+---
+
+Routing Patterns in DGate are used to match incoming requests to specific modules.
+
+DGate uses [go-chi routing](https://go-chi.io/#/pages/routing) under the hood, which supports a variety of routing patterns.
+
+## Pattern Types
+
+### Direct matching
+
+Direct matching is the simplest form of pattern matching. The domain must match the pattern exactly.
+
+- `/` will only match `/`.
+- `/route` will only match `/route`.
+- `/route/` will only match `/route/`.
+
+### Wildcard matching
+
+Wildcards are used to match multiple paths. The wildcard character is `*`.
+
+- `/route/*` will match `/route/abc`, `/route/123`, `/route/`, etc.
+- `/route/*` will not match `/route`
+- `/route/*/` will match `/route/abc/`, `/route/abc/123/`, `/route/`, etc.
+
+### Routing Parameters
+
+Routing parameters are used to match specific patterns. The pattern must be enclosed in `{}`.
+
+- `/route/{id}` will match `/route/abc123`, etc.
+- `/route/{month}-{year}` will match `/route/10-2020`, etc.
+- `/route/{id}/{name}` will match `/route/abc123/xyz`, etc.
+
+### Regular Expressions
+
+Regular expressions can be combined with routing parameters to match specific patterns.
+
+- `/route/{id:[0-9]+}` will match `/route/1`, `/route/123`, etc.
+- `/route/{id:[a-z]+}` will match `/route/abc`, `/route/xyz`, etc.
+- `/route/{id:[a-z0-9]+}` will match `/route/abc123`, `/route/xyz123`, etc.
+
+
+:::tip
+When using modules, the slug can be used to get the part of the path that was matched by the pattern.
+
+For example, if the path is `/route/{id}`, the slug `id` can be used to get the value of the `id` parameter. If the path is `/route/*`, the slug `*` can be used to get the value of the wildcard.
+
+```typescript
+function testFunction(ctx: ModuleContext) {
+    const id = ctx.pathParam('id'); // returns matched value of {id} or undefined
+    ...
+}
+```
+:::

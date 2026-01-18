@@ -1,0 +1,454 @@
+---
+id: dgate-server
+title: DGate Server
+description: dgate-server guide for installing, usage and examples.
+---
+
+DGate Server is a high-performance, open-source, and scalable proxy server that sits between a client and the upstream service(s). It is designed to handle a large number of concurrent connections and can be used to load balance, secure, and optimize traffic between clients and services.
+
+## Installation
+
+### Using Go
+
+```bash
+go install github.com/dgate-io/dgate/cmd/dgate-server@latest
+```
+
+```bash
+dgate-server --help
+```
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/dgate-io/dgate:latest
+docker run -it --rm ghcr.io/dgate-io/dgate dgate-server --help
+```
+
+import GithubReleaseFetcher from '@site/src/components/GithubReleaseFetcher';
+
+
+<GithubReleaseFetcher>
+## Binary Releases (Linux, MacOS, Windows)
+</GithubReleaseFetcher>
+
+## Setting up DGate Server Config
+
+```json
+version: v1
+log_level: ${LOG_LEVEL:-info}
+tags: ["test"]
+storage:
+  type: file
+  dir: .dgate/data/
+proxy:
+  port: ${PORT:-80}
+  host: 0.0.0.0
+  global_headers:
+    X-Test-Header: ${TEST_HEADER:-test}
+admin:
+  port: 9080
+  host: 0.0.0.0
+  allow_list:
+    - "192.168.13.37"
+    - "127.0.0.1/8"
+    - "::1"
+```
+
+## DGate Configuration
+
+### Version
+- `version`
+- Type: `string`
+- Description: The version of the configuration file.
+
+### Log Level
+- `log_level`
+- Type: `"debug" | "info" | "warn" | "error"`
+- Description: The log level for the DGate server. Default is `"info"
+
+### Log JSON
+- `log_json`
+- Type: `bool`
+- Description: If `true`, the logs will be output in JSON format.
+
+### Log Color
+- `log_color`
+- Type: `bool`
+- Description: If `true`, the logs will be output in color for the log level.
+
+### Node ID
+- `node_id`
+- Type: `string`
+- Description: The unique identifier for the DGate server.
+
+### Storage
+- `storage.type`
+  - Type: `"memory" | "file" | "debug"`
+- `storage.config`
+  - Type: `map[string]any`
+
+### Proxy Config
+- `proxy.host`
+  - Type: `string`
+- `proxy.port`
+  - Type: `int`
+- `proxy.tls`
+  - Type: [DGateTLSConfig](#DGateTLSConfig)
+- `proxy.enable_h2c`
+  - Type: `bool`
+- `proxy.enable_http2`
+  - Type: `bool`
+- `proxy.enable_console_logger`
+  - Type: `bool`
+- `proxy.redirect_https`
+  - Type: `[]string`
+- `proxy.allowed_domains`
+  - Type: `[]string`
+- `proxy.global_headers`
+  - Type: `map[string]string`
+- `proxy.client_transport`
+  - Type: [DGateHttpTransportConfig](#DGateHttpTransportConfig)
+- `proxy.init_resources`
+  - Type: [DGateResources](#DGateResources)
+- `proxy.disable_x_forwarded_headers`
+  - Type: `bool`
+
+### Admin Config
+- `admin.host`
+  - Type: `string`
+- `admin.port`
+  - Type: `int`
+- `admin.allow_list`
+  - Type: `[]string`
+- `admin.x_forwarded_for_depth`
+  - Type: `int`
+- `admin.watch_only`
+  - Type: `bool`
+- `admin.replication`
+  - Type: [DGateReplicationConfig](#DGateReplicationConfig)
+- `admin.tls`
+  - Type: [DGateTLSConfig](#DGateTLSConfig)
+
+- `admin.auth_method`
+  - Type: `"basic" | "key" | "jwt"`
+- `admin.basic_auth`
+  - Type: [DGateBasicAuthConfig](#DGateBasicAuthConfig)
+
+{/*- `admin.key_auth`
+  - Type: [DGateKeyAuthConfig](#DGateKeyAuthConfig)
+- `admin.jwt_auth`
+  - Type: [DGateJWTAuthConfig](#DGateJWTAuthConfig) */}
+
+### Test Server Config
+- `test_server.host`
+  - Type: `string`
+- `test_server.port`
+  - Type: `int`
+- `test_server.enable_h2c`
+  - Type: `bool`
+- `test_server.enable_http2`
+  - Type: `bool`
+- `test_server.enable_env_vars`
+  - Type: `bool`
+- `test_server.global_headers`
+  - Type: `map[string]string`
+
+### Debug
+- `debug`
+  - Type: `bool`
+
+### Tags
+- `tags`
+  - Type: `[]string`
+
+### Disable Metrics
+- `disable_metrics`
+  - Type: `bool`
+
+### Disable Default Namespace
+- `disable_default_namespace`
+  - Type: `bool`
+
+
+## Configuration Definitions
+
+### DGateNativeModulesConfig \{#DGateNativeModulesConfig}
+- `native_modules.name`
+  - Type: `string`
+- `native_modules.path`
+  - Type: `string`
+
+### DGateReplicationConfig \{#DGateReplicationConfig}
+- `replication.id`
+  - Type: `string`
+- `replication.shared_key`
+  - Type: `string`
+- `replication.bootstrap_cluster`
+  - Type: `bool`
+- `replication.discovery_domain`
+  - Type: `string`
+- `replication.cluster_address`
+  - Type: `[]string`
+- `replication.advert_address`
+  - Type: `string`
+- `replication.advert_scheme`
+  - Type: `string`
+- `replication.raft_config`
+  - Type: [RaftConfig](#RaftConfig)
+
+### RaftConfig \{#RaftConfig}
+- `raft_config.heartbeat_timeout`
+  - Type: `time.Duration`
+- `raft_config.election_timeout`
+  - Type: `time.Duration`
+- `raft_config.commit_timeout`
+  - Type: `time.Duration`
+- `raft_config.snapshot_interval`
+  - Type: `time.Duration`
+- `raft_config.snapshot_threshold`
+  - Type: `int`
+- `raft_config.max_append_entries`
+  - Type: `int`
+- `raft_config.trailing_logs`
+  - Type: `int`
+- `raft_config.leader_lease_timeout`
+  - Type: `time.Duration`
+
+### DGateDashboardConfig \{#DGateDashboardConfig}
+- `dashboard.enable`
+  - Type: `bool`
+
+### DGateBasicAuthConfig \{#DGateBasicAuthConfig}
+- `basic_auth.users`
+  - Type: `[]DGateUserCredentials`
+
+### DGateUserCredentials \{#DGateUserCredentials}
+- `basic_auth.users[i].username`
+  - Type: `string`
+- `basic_auth.users[i].password`
+  - Type: `string`
+
+{/* ### DGateKeyAuthConfig \{#DGateKeyAuthConfig}
+- `key_auth.query_param_name`
+  - Type: `string`
+- `key_auth.header_name`
+  - Type: `string`
+- `key_auth.keys`
+  - Type: `[]string` */}
+
+{/* ### DGateJWTAuthConfig \{#DGateJWTAuthConfig}
+- `jwt_auth.header_name`
+  - Type: `string`
+- `jwt_auth.algorithm`
+  - Type: `string`
+- `jwt_auth.signature_config`
+  - Type: `map[string]any` */}
+
+{/* ### AsymmetricSignatureConfig \{#AsymmetricSignatureConfig}
+- `asymmetric_signature.algorithm`
+  - Type: `string`
+- `asymmetric_signature.public_key`
+  - Type: `string`
+- `asymmetric_signature.public_key_file`
+  - Type: `string` */}
+
+{/* ### SymmetricSignatureConfig \{#SymmetricSignatureConfig}
+- `symmetric_signature.algorithm`
+  - Type: `string`
+- `symmetric_signature.key`
+  - Type: `string` */}
+
+### DGateTLSConfig \{#DGateTLSConfig}
+- `tls.port`
+  - Type: `int`
+- `tls.cert_file`
+  - Type: `string`
+- `tls.key_file`
+  - Type: `string`
+
+### DGateHttpTransportConfig \{#DGateHttpTransportConfig}
+- `client_transport.dns_server`
+  - Type: `string`
+- `client_transport.dns_timeout`
+  - Type: `time.Duration`
+- `client_transport.dns_prefer_go`
+  - Type: `bool`
+- `client_transport.max_idle_conns`
+  - Type: `int`
+- `client_transport.max_idle_conns_per_host`
+  - Type: `int`
+- `client_transport.max_conns_per_host`
+  - Type: `int`
+- `client_transport.idle_conn_timeout`
+  - Type: `time.Duration`
+- `client_transport.force_attempt_http2`
+  - Type: `bool`
+- `client_transport.disable_compression`
+  - Type: `bool`
+- `client_transport.tls_handshake_timeout`
+  - Type: `time.Duration`
+- `client_transport.expect_continue_timeout`
+  - Type: `time.Duration`
+- `client_transport.max_response_header_bytes`
+  - Type: `int64`
+- `client_transport.write_buffer_size`
+  - Type: `int`
+- `client_transport.read_buffer_size`
+  - Type: `int`
+- `client_transport.max_body_bytes`
+  - Type: `int`
+- `client_transport.disable_keep_alives`
+  - Type: `bool`
+- `client_transport.keep_alive`
+  - Type: `time.Duration`
+- `client_transport.response_header_timeout`
+  - Type: `time.Duration`
+- `client_transport.dial_timeout`
+  - Type: `time.Duration`
+
+### DGateFileConfig \{#DGateFileConfig}
+- `file_config.dir`
+  - Type: `string`
+
+### DGateResources \{#DGateResources}
+- `resources.skip_validation`
+  - Type: `bool`
+- `resources.namespaces`
+  - Type: [][Namespace](#Namespace)
+- `resources.services`
+  - Type: [][Service](#Service)
+- `resources.routes`
+  - Type: [][Route](#Route)
+- `resources.modules`
+  - Type: [][Module](#Module)
+- `resources.domains`
+  - Type: [][Domain](#Domain)
+- `resources.collections`
+  - Type: [][Collection](#Collection)
+- `resources.documents`
+  - Type: [][Document](#Document)
+- `resources.secrets`
+  - Type: [][Secret](#Secret)
+
+### Namespace \{#Namespace}
+- `namespace.name`
+  - Type: `string`
+- `namespace.tags`
+  - Type: `[]string`
+
+### Service \{#Service}
+- `service.name`
+  - Type: `string`
+- `service.urls`
+  - Type: `[]string`
+- `service.namespace`
+  - Type: `string`
+- `service.retries`
+  - Type: `int`
+- `service.retryTimeout`
+  - Type: `time.Duration`
+- `service.connectTimeout`
+  - Type: `time.Duration`
+- `service.requestTimeout`
+  - Type: `time.Duration`
+- `service.tlsSkipVerify`
+  - Type: `bool`
+- `service.http2Only`
+  - Type: `bool`
+- `service.hideDGateHeaders`
+  - Type: `bool`
+- `service.disableQueryParams`
+  - Type: `bool`
+- `service.tags`
+  - Type: `[]string`
+
+### Route \{#Route}
+- `route.name`
+  - Type: `string`
+- `route.paths`
+  - Type: `[]string`
+- `route.methods`
+  - Type: `[]string`
+- `route.preserveHost`
+  - Type: `bool`
+- `route.stripPath`
+  - Type: `bool`
+- `route.service`
+  - Type: `string`
+- `route.namespace`
+  - Type: `string`
+- `route.modules`
+  - Type: `[]string`
+- `route.tags`
+  - Type: `[]string`
+
+### Module \{#Module}
+- `module.name`
+  - Type: `string`
+- `module.namespace`
+  - Type: `string`
+- `module.payload`
+  - Type: `string`
+- `module.payload_file`
+  - Type: `string`
+- `module.moduleType`
+  - Type: `"typescript" | "javascript"`
+- `module.tags`
+  - Type: `[]string`
+
+### Domain \{#Domain}
+- `domain.name`
+  - Type: `string`
+- `domain.namespace`
+  - Type: `string`
+- `domain.patterns`
+  - Type: `[]string`
+- `domain.priority`
+  - Type: `int`
+- `domain.cert`
+  - Type: `string`
+- `domain.key`
+  - Type: `string`
+- `domain.cert_file`
+  - Type: `string`
+- `domain.key_file`
+  - Type: `string`
+- `domain.tags`
+  - Type: `[]string`
+
+### Collection \{#Collection}
+- `collection.name`
+  - Type: `string`
+- `collection.namespace`
+  - Type: `string`
+- `collection.schema`
+  - Type: `any`
+- `collection.visibility` 
+  - Type: `"public" | "private"`
+- `collection.tags`
+  - Type: `[]string`
+
+### Document \{#Document}
+- `document.id`
+  - Type: `string`
+- `document.createdAt`
+  - Type: `time.Time`
+- `document.updatedAt`
+  - Type: `time.Time`
+- `document.namespace`
+  - Type: `string`
+- `document.collection`
+  - Type: `string`
+- `document.data`
+  - Type: `any`
+
+### Secret \{#Secret}
+- `secret.name`
+  - Type: `string`
+- `secret.namespace`
+  - Type: `string`
+- `secret.data`
+  - Type: `string`
+- `secret.tags`
+  - Type: `[]string`

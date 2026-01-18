@@ -1,0 +1,49 @@
+---
+id: collections
+title: Collections
+---
+
+Collections are a way to group Documents and provide a schema for Documents to follow. Each Documents belongs to a Collection, and each Collection belongs to a Namespace.
+
+## Collection Structure
+
+```json
+{
+    "name": "collection1",
+    "namespace": "namespace1",
+    "visibility": "public",
+    "type": "document",
+
+    "schema": {
+        "field1": "string",
+        "field2": "number",
+    },
+    "tags": ["tag1", "tag2"],
+}
+```
+
+## Collection Fields
+
+### `name!`
+
+The name of the Collection.
+
+### `namespace!`
+
+The namespace that the Collection belongs to.
+
+### `visibility!`
+
+The visibility of the Collection. Can be `public` or `private`.
+
+### `type!`
+
+The type of the Collection. Can be `document`.
+
+### `schema!`
+
+The schema of the Collection. This is an object that defines the fields and types of the fields that each Document in the Collection must have.
+
+### `tags`
+
+The tags associated with the Collection. Read me about tags [here](/docs/concepts/tags).

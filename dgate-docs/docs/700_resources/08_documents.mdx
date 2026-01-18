@@ -1,0 +1,48 @@
+---
+id: documents
+title: Documents
+---
+
+Documents are data that is stored in the database, and can be accessed and manipulated using the API. Documents are stored in collections, and each document has a unique identifier.
+
+Unlike other resources in DGate, documents do not have namespaces or tags. They are stored and accessed in modules.
+
+## Document Structure
+
+```json
+{
+    "id": "document1",
+    "collection": "collection1",
+    "data": {
+        "field1": "value1",
+        "field2": "value2",
+    },
+    "namespace": "namespace1",
+}
+```
+
+## Document Fields
+
+### `id!`
+
+The unique identifier of the document.
+
+### `data!`
+
+The data of the document. This can be any type of data, including strings, numbers, arrays, and objects.
+
+### `namespace`
+
+The namespace that the document belongs to.
+
+### `collection`
+
+The collection that the document belongs to.
+
+### `createdAt`
+
+The time the document was created. (read-only)
+
+### `updatedAt`
+
+The time the document was last updated. (read-only)
