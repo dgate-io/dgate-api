@@ -10,7 +10,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{delete, get, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -168,6 +168,11 @@ pub fn create_router(state: AdminState) -> Router {
                 .route("/cluster/members", get(cluster_members))
                 .route("/cluster/members/{node_id}", put(cluster_add_member))
                 .route("/cluster/members/{node_id}", delete(cluster_remove_member)),
+        )
+        // Internal endpoints (for cluster replication)
+        .nest(
+            "/internal",
+            Router::new().route("/replicate", post(internal_replicate)),
         )
         .with_state(state)
 }
@@ -841,7 +846,7 @@ async fn cluster_status(
 ) -> Result<Json<ApiResponse<ClusterStatus>>, ApiError> {
     // Clone the Arc before any awaits to avoid holding lock across await points
     let cluster = state.proxy.cluster();
-    
+
     if let Some(cluster) = cluster {
         let metrics = cluster.metrics().await;
         let is_leader = cluster.is_leader().await;
@@ -879,7 +884,7 @@ async fn cluster_members(
     State(state): State<AdminState>,
 ) -> Result<Json<ApiResponse<Vec<ClusterMemberInfo>>>, ApiError> {
     let cluster = state.proxy.cluster();
-    
+
     if let Some(cluster) = cluster {
         let metrics = cluster.metrics().await;
         let leader_id = cluster.leader_id().await;
@@ -946,4 +951,29 @@ async fn cluster_remove_member(
         .map_err(|e| ApiError::internal(format!("Failed to remove node: {}", e)))?;
 
     Ok(Json(ApiResponse::success(())))
+}
+
+// Internal handlers for cluster replication
+
+/// Internal endpoint for receiving replicated changes from other cluster nodes
+async fn internal_replicate(
+    State(state): State<AdminState>,
+    Json(changelog): Json<ChangeLog>,
+) -> Result<Json<ApiResponse<()>>, ApiError> {
+    // Get the cluster manager
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    // Apply the replicated changelog without re-replicating
+    let response = cluster.apply_replicated(&changelog);
+
+    if response.success {
+        Ok(Json(ApiResponse::success(())))
+    } else {
+        Err(ApiError::internal(response.message.unwrap_or_else(|| {
+            "Failed to apply replicated change".to_string()
+        })))
+    }
 }

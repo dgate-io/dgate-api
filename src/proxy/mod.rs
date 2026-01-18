@@ -173,7 +173,10 @@ impl ProxyState {
             }
         };
 
-        info!("Initializing cluster mode with node_id={}", cluster_config.node_id);
+        info!(
+            "Initializing cluster mode with node_id={}",
+            cluster_config.node_id
+        );
 
         // Create channel for change notifications
         let (change_tx, change_rx) = mpsc::unbounded_channel();
@@ -213,7 +216,7 @@ impl ProxyState {
 
         while let Some(changelog) = rx.recv().await {
             debug!("Processing cluster-applied change: {:?}", changelog.cmd);
-            
+
             // Rebuild routers/domains as needed based on the change type
             if let Err(e) = self.handle_cluster_change(&changelog) {
                 error!("Failed to process cluster change: {}", e);
@@ -237,9 +240,13 @@ impl ProxyState {
                 self.rebuild_router(&changelog.namespace)?;
 
                 // Handle module executor updates for modules
-                if matches!(changelog.cmd, ChangeCommand::AddModule | ChangeCommand::DeleteModule) {
+                if matches!(
+                    changelog.cmd,
+                    ChangeCommand::AddModule | ChangeCommand::DeleteModule
+                ) {
                     if changelog.cmd == ChangeCommand::AddModule {
-                        if let Ok(module) = serde_json::from_value::<Module>(changelog.item.clone()) {
+                        if let Ok(module) = serde_json::from_value::<Module>(changelog.item.clone())
+                        {
                             let mut executor = self.module_executor.write();
                             if let Err(e) = executor.add_module(&module) {
                                 warn!("Failed to add module to executor: {}", e);
@@ -290,7 +297,7 @@ impl ProxyState {
 
     /// Apply a change log entry
     /// Apply a change log entry
-    /// 
+    ///
     /// In cluster mode, this proposes the change to the Raft cluster.
     /// The change will be applied once it's committed and replicated.
     /// In standalone mode, the change is applied directly.

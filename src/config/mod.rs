@@ -613,8 +613,11 @@ impl Default for ClusterConfig {
 pub struct ClusterMember {
     /// Node ID
     pub id: u64,
-    /// Node address (host:port)
+    /// Node address (host:port) for Raft communication
     pub addr: String,
+    /// Admin API port for internal replication (optional, defaults to deriving from addr)
+    #[serde(default)]
+    pub admin_port: Option<u16>,
 }
 
 /// Node discovery configuration

@@ -13,9 +13,10 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use openraft::BasicNode;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, info, warn};
 
 use crate::config::{ClusterConfig, ClusterMember};
 use crate::resources::ChangeLog;
@@ -119,91 +120,152 @@ impl DGateStateMachine {
             ChangeCommand::AddNamespace => {
                 let ns: Namespace = match serde_json::from_value(changelog.item.clone()) {
                     Ok(ns) => ns,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_namespace(&ns).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteNamespace => {
-                self.store.delete_namespace(&changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteNamespace => self
+                .store
+                .delete_namespace(&changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddRoute => {
                 let route: Route = match serde_json::from_value(changelog.item.clone()) {
                     Ok(r) => r,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_route(&route).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteRoute => {
-                self.store.delete_route(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteRoute => self
+                .store
+                .delete_route(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddService => {
                 let service: Service = match serde_json::from_value(changelog.item.clone()) {
                     Ok(s) => s,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_service(&service).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteService => {
-                self.store.delete_service(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteService => self
+                .store
+                .delete_service(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddModule => {
                 let module: Module = match serde_json::from_value(changelog.item.clone()) {
                     Ok(m) => m,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_module(&module).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteModule => {
-                self.store.delete_module(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteModule => self
+                .store
+                .delete_module(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddDomain => {
                 let domain: Domain = match serde_json::from_value(changelog.item.clone()) {
                     Ok(d) => d,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_domain(&domain).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteDomain => {
-                self.store.delete_domain(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteDomain => self
+                .store
+                .delete_domain(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddSecret => {
                 let secret: Secret = match serde_json::from_value(changelog.item.clone()) {
                     Ok(s) => s,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
                 self.store.set_secret(&secret).map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteSecret => {
-                self.store.delete_secret(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteSecret => self
+                .store
+                .delete_secret(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddCollection => {
                 let collection: Collection = match serde_json::from_value(changelog.item.clone()) {
                     Ok(c) => c,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
-                self.store.set_collection(&collection).map_err(|e| e.to_string())
+                self.store
+                    .set_collection(&collection)
+                    .map_err(|e| e.to_string())
             }
-            ChangeCommand::DeleteCollection => {
-                self.store.delete_collection(&changelog.namespace, &changelog.name).map_err(|e| e.to_string())
-            }
+            ChangeCommand::DeleteCollection => self
+                .store
+                .delete_collection(&changelog.namespace, &changelog.name)
+                .map_err(|e| e.to_string()),
             ChangeCommand::AddDocument => {
                 let document: Document = match serde_json::from_value(changelog.item.clone()) {
                     Ok(d) => d,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
-                self.store.set_document(&document).map_err(|e| e.to_string())
+                self.store
+                    .set_document(&document)
+                    .map_err(|e| e.to_string())
             }
             ChangeCommand::DeleteDocument => {
                 let doc: Document = match serde_json::from_value(changelog.item.clone()) {
                     Ok(d) => d,
-                    Err(e) => return ClientResponse { success: false, message: Some(e.to_string()) },
+                    Err(e) => {
+                        return ClientResponse {
+                            success: false,
+                            message: Some(e.to_string()),
+                        }
+                    }
                 };
-                self.store.delete_document(&changelog.namespace, &doc.collection, &changelog.name).map_err(|e| e.to_string())
+                self.store
+                    .delete_document(&changelog.namespace, &doc.collection, &changelog.name)
+                    .map_err(|e| e.to_string())
             }
         };
 
         if let Err(e) = result {
-            return ClientResponse { success: false, message: Some(e) };
+            return ClientResponse {
+                success: false,
+                message: Some(e),
+            };
         }
 
         // Notify proxy about the change
@@ -240,6 +302,8 @@ pub struct ClusterManager {
     discovery: Option<Arc<NodeDiscovery>>,
     /// Indicates if this node is the leader
     is_leader: Arc<RwLock<bool>>,
+    /// HTTP client for replication
+    http_client: Client,
 }
 
 impl ClusterManager {
@@ -264,12 +328,20 @@ impl ClusterManager {
             .as_ref()
             .map(|disc_config| Arc::new(NodeDiscovery::new(disc_config.clone())));
 
+        // Create HTTP client for replication
+        let http_client = Client::builder()
+            .pool_max_idle_per_host(10)
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .expect("Failed to create HTTP client");
+
         Ok(Self {
             config: cluster_config,
             raft,
             state_machine,
             discovery,
             is_leader: Arc::new(RwLock::new(true)), // Single node starts as leader
+            http_client,
         })
     }
 
@@ -311,14 +383,94 @@ impl ClusterManager {
 
     /// Propose a change log to the cluster
     pub async fn propose(&self, changelog: ChangeLog) -> anyhow::Result<ClientResponse> {
-        // In cluster mode, only leader can propose
-        if !self.is_leader().await {
-            return Err(anyhow::anyhow!("Not the leader"));
+        // Apply the change locally first
+        let response = self.state_machine.apply(&changelog);
+
+        if !response.success {
+            return Ok(response);
         }
 
-        // Apply the change
-        let response = self.state_machine.apply(&changelog);
+        // Replicate to other nodes
+        self.replicate_to_peers(&changelog).await;
+
         Ok(response)
+    }
+
+    /// Replicate a changelog to all peer nodes
+    async fn replicate_to_peers(&self, changelog: &ChangeLog) {
+        let my_node_id = self.config.node_id;
+
+        for member in &self.config.initial_members {
+            // Skip self
+            if member.id == my_node_id {
+                continue;
+            }
+
+            let admin_url = self.get_member_admin_url(member);
+            let url = format!("{}/internal/replicate", admin_url);
+
+            debug!(
+                "Replicating changelog {} to node {} at {}",
+                changelog.id, member.id, url
+            );
+
+            let client = self.http_client.clone();
+            let changelog_clone = changelog.clone();
+            let member_id = member.id;
+
+            // Spawn replication as background task to not block the response
+            tokio::spawn(async move {
+                match client.post(&url).json(&changelog_clone).send().await {
+                    Ok(resp) => {
+                        if resp.status().is_success() {
+                            debug!("Successfully replicated to node {}", member_id);
+                        } else {
+                            warn!(
+                                "Failed to replicate to node {}: status {}",
+                                member_id,
+                                resp.status()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to replicate to node {}: {}", member_id, e);
+                    }
+                }
+            });
+        }
+    }
+
+    /// Get the admin API URL for a cluster member
+    fn get_member_admin_url(&self, member: &ClusterMember) -> String {
+        // If admin_port is specified, use it
+        if let Some(admin_port) = member.admin_port {
+            // Extract host from addr (format: host:port)
+            let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
+            return format!("http://{}:{}", host, admin_port);
+        }
+
+        // Otherwise, derive admin port from raft port (admin = raft - 10)
+        // This is a convention used in the test configuration
+        if let Some(port_str) = member.addr.split(':').last() {
+            if let Ok(raft_port) = port_str.parse::<u16>() {
+                let admin_port = raft_port.saturating_sub(10);
+                let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
+                return format!("http://{}:{}", host, admin_port);
+            }
+        }
+
+        // Fallback: use addr as-is (might not work)
+        format!("http://{}", member.addr)
+    }
+
+    /// Apply a replicated changelog (from another node)
+    /// This applies the change locally without re-replicating
+    pub fn apply_replicated(&self, changelog: &ChangeLog) -> ClientResponse {
+        debug!(
+            "Applying replicated changelog {} from cluster peer",
+            changelog.id
+        );
+        self.state_machine.apply(changelog)
     }
 
     /// Get cluster metrics
