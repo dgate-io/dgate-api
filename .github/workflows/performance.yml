@@ -57,14 +57,14 @@ jobs:
       - name: Run Performance Tests
         run: |
           TEST_TYPE="${{ github.event.inputs.test_type || 'quick' }}"
-          ./perf-tests/run-tests.sh "$TEST_TYPE"
+          ./tests/performance-tests/run-tests.sh "$TEST_TYPE"
 
       - name: Upload performance results
         uses: actions/upload-artifact@v4
         with:
           name: performance-results
           path: |
-            perf-tests/*-results.json
+            tests/performance-tests/*-results.json
           retention-days: 30
 
       - name: Comment PR with results
@@ -78,7 +78,7 @@ jobs:
             // Read results if available
             const files = ['proxy-results.json', 'modules-results.json', 'admin-results.json'];
             for (const file of files) {
-              const path = `perf-tests/${file}`;
+              const path = `tests/performance-tests/${file}`;
               if (fs.existsSync(path)) {
                 comment += `### ${file.replace('-results.json', '').toUpperCase()}\n`;
                 comment += 'Results uploaded as artifacts\n\n';

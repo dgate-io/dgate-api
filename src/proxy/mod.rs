@@ -545,10 +545,13 @@ impl ProxyState {
 
     /// Initialize from stored change logs
     pub async fn restore_from_changelogs(&self) -> Result<(), ProxyError> {
-        let changelogs = self
+        let mut changelogs = self
             .store
             .list_changelogs()
             .map_err(|e| ProxyError::Storage(e.to_string()))?;
+
+        // Sort changelogs by timestamp to ensure proper ordering
+        changelogs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
         info!("Restoring {} change logs", changelogs.len());
 

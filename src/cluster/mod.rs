@@ -1,11 +1,21 @@
 //! Cluster module for DGate
 //!
-//! Provides Raft-based consensus for replicating resources and documents
-//! across multiple DGate nodes. Supports both static member configuration
-//! and DNS-based discovery.
+//! Provides replication for resources and documents across multiple DGate nodes.
+//! Supports both static member configuration and DNS-based discovery.
 //!
-//! This module is designed to integrate with the `openraft` library but
-//! currently provides a stub implementation that can be expanded.
+//! # Architecture
+//!
+//! This module contains two implementation approaches:
+//!
+//! 1. **Simple HTTP Replication** (currently active in `mod.rs`):
+//!    - Uses direct HTTP calls to replicate changes to peer nodes
+//!    - All nodes can accept writes and replicate to others
+//!    - Simple and effective for most use cases
+//!
+//! 2. **Full Raft Consensus** (in `state_machine.rs` and `network.rs`):
+//!    - Complete openraft integration with leader election, log replication
+//!    - Provides stronger consistency guarantees
+//!    - Can be enabled by wiring up the openraft components
 
 mod discovery;
 
@@ -18,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use crate::config::{ClusterConfig, ClusterMember};
+use crate::config::{ClusterConfig, ClusterMember, ClusterMode};
 use crate::resources::ChangeLog;
 use crate::storage::ProxyStore;
 
@@ -34,18 +44,19 @@ pub struct ClientResponse {
     pub message: Option<String>,
 }
 
-/// Snapshot data for state machine (used for Raft snapshots)
+/// Snapshot data for state machine (used by openraft implementation in state_machine.rs)
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SnapshotData {
     pub changelogs: Vec<ChangeLog>,
 }
 
-/// Raft type configuration placeholder (for future openraft integration)
+/// Raft type configuration (used by openraft implementation in state_machine.rs and network.rs)
 #[allow(dead_code)]
 pub struct TypeConfig;
 
-/// The Raft instance type - placeholder for now
+/// Simplified Raft instance for the HTTP replication approach.
+/// For full Raft consensus, see the openraft implementation in state_machine.rs and network.rs.
 pub struct DGateRaft {
     node_id: NodeId,
     members: RwLock<BTreeMap<NodeId, BasicNode>>,
@@ -70,7 +81,7 @@ impl DGateRaft {
         *self.leader_id.read().await
     }
 
-    /// Handle a vote request (Raft protocol - for future use)
+    /// Handle a vote request (stub - full implementation in network.rs)
     #[allow(dead_code)]
     pub async fn vote(
         &self,
@@ -79,7 +90,7 @@ impl DGateRaft {
         Ok(serde_json::json!({"vote_granted": true}))
     }
 
-    /// Handle append entries request (Raft protocol - for future use)
+    /// Handle append entries request (stub - full implementation in network.rs)
     #[allow(dead_code)]
     pub async fn append_entries(
         &self,
@@ -88,7 +99,7 @@ impl DGateRaft {
         Ok(serde_json::json!({"success": true}))
     }
 
-    /// Handle install snapshot request (Raft protocol - for future use)
+    /// Handle install snapshot request (stub - full implementation in network.rs)
     #[allow(dead_code)]
     pub async fn install_snapshot(
         &self,
@@ -298,6 +309,8 @@ impl DGateStateMachine {
 #[derive(Debug, Clone, Serialize)]
 pub struct ClusterMetrics {
     pub id: NodeId,
+    pub mode: ClusterMode,
+    pub is_leader: bool,
     pub current_term: Option<u64>,
     pub last_applied: Option<u64>,
     pub committed: Option<u64>,
@@ -327,10 +340,11 @@ impl ClusterManager {
         state_machine: Arc<DGateStateMachine>,
     ) -> anyhow::Result<Self> {
         let node_id = cluster_config.node_id;
+        let mode = cluster_config.mode;
 
         info!(
-            "Creating cluster manager for node {} at {}",
-            node_id, cluster_config.advertise_addr
+            "Creating cluster manager for node {} at {} (mode: {:?})",
+            node_id, cluster_config.advertise_addr, mode
         );
 
         // Create simplified Raft instance
@@ -349,12 +363,19 @@ impl ClusterManager {
             .build()
             .expect("Failed to create HTTP client");
 
+        // In simple mode, all nodes are leaders (can accept writes)
+        // In raft mode, only the bootstrap node starts as leader
+        let is_leader = match mode {
+            ClusterMode::Simple => true, // All nodes can accept writes
+            ClusterMode::Raft => cluster_config.bootstrap, // Only bootstrap node starts as leader
+        };
+
         Ok(Self {
             config: cluster_config,
             raft,
             state_machine,
             discovery,
-            is_leader: Arc::new(RwLock::new(true)), // Single node starts as leader
+            is_leader: Arc::new(RwLock::new(is_leader)),
             http_client,
         })
     }
@@ -362,16 +383,36 @@ impl ClusterManager {
     /// Initialize the cluster
     pub async fn initialize(&self) -> anyhow::Result<()> {
         let node_id = self.config.node_id;
+        let mode = self.config.mode;
 
-        if self.config.bootstrap {
-            info!("Bootstrapping single-node cluster with node_id={}", node_id);
-            *self.is_leader.write().await = true;
-        } else if !self.config.initial_members.is_empty() {
-            info!(
-                "Initializing cluster with {} initial members",
-                self.config.initial_members.len()
-            );
-            // In a full implementation, would connect to other nodes here
+        match mode {
+            ClusterMode::Simple => {
+                info!(
+                    "Initializing simple replication cluster with node_id={}",
+                    node_id
+                );
+                // In simple mode, all nodes are peers and can accept writes
+                *self.is_leader.write().await = true;
+            }
+            ClusterMode::Raft => {
+                if self.config.bootstrap {
+                    info!(
+                        "Bootstrapping Raft cluster with node_id={} as leader",
+                        node_id
+                    );
+                    *self.is_leader.write().await = true;
+                } else if !self.config.initial_members.is_empty() {
+                    info!(
+                        "Joining Raft cluster with {} members as follower",
+                        self.config.initial_members.len()
+                    );
+                    *self.is_leader.write().await = false;
+                    // In a full Raft implementation, would:
+                    // 1. Connect to existing cluster members
+                    // 2. Request to join the cluster
+                    // 3. Participate in leader election
+                }
+            }
         }
 
         // Start discovery background task if configured
@@ -383,6 +424,11 @@ impl ClusterManager {
         }
 
         Ok(())
+    }
+
+    /// Get the cluster mode
+    pub fn mode(&self) -> ClusterMode {
+        self.config.mode
     }
 
     /// Check if this node is the current leader
@@ -493,6 +539,8 @@ impl ClusterManager {
     pub async fn metrics(&self) -> ClusterMetrics {
         ClusterMetrics {
             id: self.raft.node_id(),
+            mode: self.config.mode,
+            is_leader: *self.is_leader.read().await,
             current_term: Some(1),
             last_applied: Some(0),
             committed: Some(0),

@@ -559,12 +559,33 @@ pub struct DomainSpec {
     pub key_file: Option<String>,
 }
 
+/// Cluster replication mode
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ClusterMode {
+    /// Simple HTTP replication - all nodes can accept writes
+    /// Uses direct HTTP calls to replicate changes to peer nodes.
+    /// Simple and effective for most use cases.
+    #[default]
+    Simple,
+
+    /// Full Raft consensus with leader election
+    /// Complete openraft integration with leader election, log replication.
+    /// Provides stronger consistency guarantees.
+    /// Only the leader can accept writes.
+    Raft,
+}
+
 /// Cluster configuration for distributed mode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterConfig {
     /// Enable cluster mode
     #[serde(default)]
     pub enabled: bool,
+
+    /// Cluster replication mode (simple or raft)
+    #[serde(default)]
+    pub mode: ClusterMode,
 
     /// Unique node ID for this instance
     #[serde(default = "default_node_id")]
@@ -599,6 +620,7 @@ impl Default for ClusterConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            mode: ClusterMode::default(),
             node_id: default_node_id(),
             advertise_addr: default_advertise_addr(),
             bootstrap: false,

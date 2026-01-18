@@ -41,26 +41,34 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          cd functional-tests/websocket && npm ci
+          cd tests/functional-tests/websocket && npm ci
           cd ../grpc && npm ci
 
       - name: Install netcat
         run: sudo apt-get update && sudo apt-get install -y netcat-openbsd
 
       - name: Run HTTP/2 Tests
-        run: ./functional-tests/http2/run-test.sh
+        run: ./tests/functional-tests/http2/run-test.sh
         continue-on-error: true
 
       - name: Run WebSocket Tests
-        run: ./functional-tests/websocket/run-test.sh
+        run: ./tests/functional-tests/websocket/run-test.sh
         continue-on-error: true
 
       - name: Run gRPC Tests
-        run: ./functional-tests/grpc/run-test.sh
+        run: ./tests/functional-tests/grpc/run-test.sh
         continue-on-error: true
 
       - name: Run QUIC Tests
-        run: ./functional-tests/quic/run-test.sh
+        run: ./tests/functional-tests/quic/run-test.sh
+        continue-on-error: true
+
+      - name: Run Simple Replication Cluster Tests
+        run: ./tests/functional-tests/simple-replication/run-test.sh
+        continue-on-error: true
+
+      - name: Run Raft Consensus Cluster Tests
+        run: ./tests/functional-tests/raft-consensus/run-test.sh
         continue-on-error: true
 
       - name: Upload test logs
