@@ -3,15 +3,15 @@ id: routing_patterns
 title: Routing Patterns
 ---
 
-Routing Patterns in DGate are used to match incoming requests to specific modules.
+Routing Patterns in DGate are used to match incoming requests to specific routes and their associated modules/services.
 
-DGate uses [go-chi routing](https://go-chi.io/#/pages/routing) under the hood, which supports a variety of routing patterns.
+DGate uses axum-style routing with support for path parameters and wildcards.
 
 ## Pattern Types
 
 ### Direct matching
 
-Direct matching is the simplest form of pattern matching. The domain must match the pattern exactly.
+Direct matching is the simplest form of pattern matching. The path must match the pattern exactly.
 
 - `/` will only match `/`.
 - `/route` will only match `/route`.
@@ -19,38 +19,98 @@ Direct matching is the simplest form of pattern matching. The domain must match 
 
 ### Wildcard matching
 
-Wildcards are used to match multiple paths. The wildcard character is `*`.
+Wildcards are used to match multiple paths. DGate supports two wildcard patterns:
 
-- `/route/*` will match `/route/abc`, `/route/123`, `/route/`, etc.
-- `/route/*` will not match `/route`
-- `/route/*/` will match `/route/abc/`, `/route/abc/123/`, `/route/`, etc.
+- `/**` (double asterisk) - matches any path including nested paths
+  - `/route/**` will match `/route/abc`, `/route/abc/123`, `/route/a/b/c`, etc.
+  - `/api/**` will match `/api`, `/api/users`, `/api/users/123`, etc.
 
-### Routing Parameters
+- `/*` (single asterisk) - matches a single path segment
+  - `/route/*` will match `/route/abc`, `/route/123`, but NOT `/route/abc/123`
 
-Routing parameters are used to match specific patterns. The pattern must be enclosed in `{}`.
+### Path Parameters
 
-- `/route/{id}` will match `/route/abc123`, etc.
-- `/route/{month}-{year}` will match `/route/10-2020`, etc.
-- `/route/{id}/{name}` will match `/route/abc123/xyz`, etc.
+Path parameters are used to capture specific segments of the path. Parameters are enclosed in `{}`.
 
-### Regular Expressions
+- `/route/{id}` will match `/route/abc123` and capture `id = "abc123"`
+- `/route/{month}-{year}` will match `/route/10-2020` and capture `month = "10"`, `year = "2020"`
+- `/route/{id}/{name}` will match `/route/abc123/xyz` and capture `id = "abc123"`, `name = "xyz"`
 
-Regular expressions can be combined with routing parameters to match specific patterns.
+### Combining Parameters with Wildcards
 
-- `/route/{id:[0-9]+}` will match `/route/1`, `/route/123`, etc.
-- `/route/{id:[a-z]+}` will match `/route/abc`, `/route/xyz`, etc.
-- `/route/{id:[a-z0-9]+}` will match `/route/abc123`, `/route/xyz123`, etc.
+You can combine path parameters with wildcards for flexible routing:
 
+- `/{namespace}/**` will match `/myapp/api/users` and capture `namespace = "myapp"`
+- `/api/{version}/**` will match `/api/v1/users/123` and capture `version = "v1"`
 
-:::tip
-When using modules, the slug can be used to get the part of the path that was matched by the pattern.
+## Accessing Path Parameters in Modules
 
-For example, if the path is `/route/{id}`, the slug `id` can be used to get the value of the `id` parameter. If the path is `/route/*`, the slug `*` can be used to get the value of the wildcard.
+When using modules, you can access captured path parameters using the context object:
 
-```typescript
-function testFunction(ctx: ModuleContext) {
-    const id = ctx.pathParam('id'); // returns matched value of {id} or undefined
-    ...
+```javascript
+function requestHandler(ctx) {
+    // Access path parameters
+    const id = ctx.pathParam('id');
+    const namespace = ctx.params.namespace;
+    
+    ctx.json({
+        id: id,
+        namespace: namespace
+    });
 }
 ```
+
+:::tip
+Path parameters can be accessed either through:
+- `ctx.pathParam('name')` - method that returns the value or null
+- `ctx.params.name` - direct property access on the params object
 :::
+
+## Examples
+
+### Basic API Route
+
+```yaml
+routes:
+  - name: "user-api"
+    namespace: "default"
+    paths: ["/api/users/{id}"]
+    methods: ["GET", "PUT", "DELETE"]
+    service: "user-service"
+```
+
+### Catch-all Route
+
+```yaml
+routes:
+  - name: "static-files"
+    namespace: "default"
+    paths: ["/static/**"]
+    methods: ["GET"]
+    service: "static-server"
+    strip_path: true
+```
+
+### Multiple Patterns
+
+```yaml
+routes:
+  - name: "health-check"
+    namespace: "default"
+    paths: ["/health", "/healthz", "/ready"]
+    methods: ["GET"]
+    modules: ["health-module"]
+```
+
+### Wildcard Method Matching
+
+Use `"*"` to match all HTTP methods:
+
+```yaml
+routes:
+  - name: "proxy-all"
+    namespace: "default"
+    paths: ["/proxy/**"]
+    methods: ["*"]
+    service: "backend"
+```

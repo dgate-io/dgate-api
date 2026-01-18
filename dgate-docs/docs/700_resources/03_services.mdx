@@ -10,16 +10,16 @@ Services are an abstraction of upstream services. They are used to define the co
 ```json
 {
     "name": "service1",
-    "urls": ["http://example.com/v1", "http://example.net/v1"],
     "namespace": "namespace1",
+    "urls": ["http://backend-1:8080", "http://backend-2:8080"],
     "retries": 3,
-    "retryTimeout": "5s",
-    "connectTimeout": "1s",
-    "requestTimeout": "5s",
-    "tlsSkipVerify": false,
-    "http2Only": false,
-    "hideDGateHeaders": false,
-    "disableQueryParams": false,
+    "retry_timeout_ms": 5000,
+    "connect_timeout_ms": 1000,
+    "request_timeout_ms": 30000,
+    "tls_skip_verify": false,
+    "http2_only": false,
+    "hide_dgate_headers": false,
+    "disable_query_params": false,
     "tags": ["tag1", "tag2"]
 }
 ```
@@ -30,47 +30,141 @@ Services are an abstraction of upstream services. They are used to define the co
 
 The name of the service.
 
+### `namespace!`
+
+The namespace that the service belongs to.
+
 ### `urls!`
 
 The URLs of the upstream service. Multiple URLs can be provided to allow for load balancing and failover.
 
-### `namespace`
-
-The namespace that the service belongs to.
+```json
+{
+    "urls": [
+        "http://backend-1:8080",
+        "http://backend-2:8080",
+        "http://backend-3:8080"
+    ]
+}
+```
 
 ### `retries`
 
 The number of times to retry a request to the upstream service if it fails. Default is `3`.
 
-### `retryTimeout`
+### `retry_timeout_ms`
 
-The time to wait before retrying a request to the upstream service. Default is `5s`.
+The time in milliseconds to wait before retrying a request to the upstream service. Default is `5000` (5 seconds).
 
-### `connectTimeout`
+### `connect_timeout_ms`
 
-The time to wait before timing out a connection to the upstream service. Default is `1s`.
+The time in milliseconds to wait before timing out a connection to the upstream service. Default is `1000` (1 second).
 
-### `requestTimeout`
+### `request_timeout_ms`
 
-The time to wait before timing out a request to the upstream service. Default is `5s`.
+The time in milliseconds to wait before timing out a request to the upstream service. Default is `30000` (30 seconds).
 
-### `tlsSkipVerify`
+### `tls_skip_verify`
 
 If `true`, DGate will skip verifying the TLS certificate of the upstream service. Default is `false`.
 
-### `http2Only`
+:::warning
+Only enable this in development environments. Disabling TLS verification in production is a security risk.
+:::
+
+### `http2_only`
 
 If `true`, DGate will only use HTTP/2 to communicate with the upstream service. Default is `false`.
 
-### `hideDGateHeaders`
+### `hide_dgate_headers`
 
-If `true`, DGate will not send its headers to the upstream service. Default is `false`.
+If `true`, DGate will not send its custom headers (like `X-DGate-*`) to the upstream service. Default is `false`.
 
-### `disableQueryParams`
+### `disable_query_params`
 
 If `true`, DGate will not forward query parameters to the upstream service. Default is `false`.
 
 ### `tags`
 
-Tags that the service belongs to. Tags can be used for access control, canary, etc. Read me about tags [here](/docs/concepts/tags).
+Tags that the service belongs to. Tags can be used for access control, canary deployments, etc. Read more about tags [here](/docs/concepts/tags).
 
+## Examples
+
+### Basic HTTP Service
+
+```yaml
+services:
+  - name: "backend"
+    namespace: "default"
+    urls: ["http://backend:8080"]
+    request_timeout_ms: 30000
+```
+
+### Load Balanced Service
+
+```yaml
+services:
+  - name: "api-cluster"
+    namespace: "default"
+    urls:
+      - "http://api-1:8080"
+      - "http://api-2:8080"
+      - "http://api-3:8080"
+    retries: 3
+    request_timeout_ms: 10000
+```
+
+### HTTPS Service
+
+```yaml
+services:
+  - name: "external-api"
+    namespace: "default"
+    urls: ["https://api.example.com"]
+    request_timeout_ms: 60000
+```
+
+### Service with Path Prefix
+
+You can include a path in the service URL that will be used as a base path:
+
+```yaml
+services:
+  - name: "api-v2"
+    namespace: "default"
+    urls: ["http://backend:8080/api/v2"]
+```
+
+When combined with a route using `strip_path: true`, the stripped path will be appended to this base path.
+
+## API Examples
+
+### Create a Service via Admin API
+
+```bash
+curl -X PUT http://localhost:9080/api/v1/service/default/my-service \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": ["http://backend:8080"],
+    "request_timeout_ms": 30000,
+    "retries": 3
+  }'
+```
+
+### List Services
+
+```bash
+curl http://localhost:9080/api/v1/service
+```
+
+### Get a Specific Service
+
+```bash
+curl http://localhost:9080/api/v1/service/default/my-service
+```
+
+### Delete a Service
+
+```bash
+curl -X DELETE http://localhost:9080/api/v1/service/default/my-service
+```

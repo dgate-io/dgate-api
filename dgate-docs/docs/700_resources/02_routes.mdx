@@ -3,20 +3,20 @@ id: routes
 title: Routes
 ---
 
-Routes are used to define how requests are handled in DGate. They are used to match incoming requests and forward them to the appropriate upstream service.
+Routes are used to define how requests are handled in DGate. They are used to match incoming requests and forward them to the appropriate upstream service or module handlers.
 
 ## Route Structure
 
 ```json
 {
     "name": "route1",
-    "paths": ["/route1"],
+    "namespace": "namespace1",
+    "paths": ["/route1", "/api/**"],
     "methods": ["GET", "POST"],
-    "preserveHost": true,
-    "stripPath": false,
+    "preserve_host": true,
+    "strip_path": false,
     "service": "service1",
     "modules": ["module1", "module2"],
-    "namespace": "namespace1",
     "tags": ["tag1", "tag2"]
 }
 ```
@@ -27,38 +27,108 @@ Routes are used to define how requests are handled in DGate. They are used to ma
 
 The name of the route.
 
+### `namespace!`
+
+The namespace that the route belongs to.
+
 ### `paths!`
 
 Paths that the route should match. Read more about [routing patterns](/docs/concepts/routing_patterns).
+
+Examples:
+- `/api` - exact match
+- `/api/**` - matches any path starting with `/api/`
+- `/users/{id}` - captures path parameter `id`
 
 ### `methods!`
 
 HTTP methods that the route should match. Valid methods are `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `OPTIONS`, `HEAD`, `CONNECT`, `TRACE`.
 
-### `preserveHost`
+Use `["*"]` to match all methods.
 
-If `true`, the host header will be preserved and sent to the upstream service.
+### `preserve_host`
 
-### `stripPath`
+If `true`, the host header will be preserved and sent to the upstream service. Default is `false`.
 
-If `true`, the path will be stripped from the request before it is sent to the upstream service.
+### `strip_path`
 
-> If the path that ends with a wildcard, the path will strip the characters before the wildcard. For example, if the path is `/route/*`, the path `/route/img/icon.svg` will be stripped to `/img/icon.svg`.
-> If the service URL also includes a path, the path will be appended to the service path. For example, if the service path is `/service`, the path `/route/img/icon.svg` will be stripped to `/service/img/icon.svg`
+If `true`, the matched path prefix will be stripped from the request before it is sent to the upstream service. Default is `false`.
+
+> If the path ends with a wildcard, the path will strip the characters before the wildcard. For example, if the path is `/route/**`, the path `/route/img/icon.svg` will be stripped to `/img/icon.svg`.
+> If the service URL also includes a path, the stripped path will be appended to the service path.
 
 ### `service`
 
-The name of the service that the route should forward the request to.
-
-### `namespace`
-
-The namespace that the route belongs to.
+The name of the service that the route should forward the request to. Optional if using modules with `requestHandler`.
 
 ### `modules`
 
-Modules that should be executed for the route.
+List of modules that should be executed for the route. Modules are executed in order.
 
 ### `tags`
 
-Tags that can be used to filter or search for routes. Read me about tags [here](/docs/concepts/tags).
+Tags that can be used to filter or search for routes. Read more about tags [here](/docs/concepts/tags).
+
+## Examples
+
+### Basic Proxy Route
+
+```yaml
+routes:
+  - name: "api-proxy"
+    namespace: "default"
+    paths: ["/api/**"]
+    methods: ["*"]
+    service: "backend"
+    strip_path: true
+```
+
+### Serverless Function Route
+
+```yaml
+routes:
+  - name: "health-check"
+    namespace: "default"
+    paths: ["/health"]
+    methods: ["GET"]
+    modules: ["health-module"]
+```
+
+### Route with Path Parameters
+
+```yaml
+routes:
+  - name: "user-api"
+    namespace: "default"
+    paths: ["/users/{id}"]
+    methods: ["GET", "PUT", "DELETE"]
+    service: "user-service"
+```
+
+## API Examples
+
+### Create a Route
+
+```bash
+curl -X PUT http://localhost:9080/api/v1/route/default/my-route \
+  -H "Content-Type: application/json" \
+  -d '{
+    "paths": ["/api/**"],
+    "methods": ["GET", "POST"],
+    "service": "backend",
+    "strip_path": true
+  }'
+```
+
+### List Routes
+
+```bash
+curl http://localhost:9080/api/v1/route
+```
+
+### Delete a Route
+
+```bash
+curl -X DELETE http://localhost:9080/api/v1/route/default/my-route
+```
 

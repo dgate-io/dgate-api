@@ -3,21 +3,21 @@ id: documents
 title: Documents
 ---
 
-Documents are data that is stored in the database, and can be accessed and manipulated using the API. Documents are stored in collections, and each document has a unique identifier.
-
-Unlike other resources in DGate, documents do not have namespaces or tags. They are stored and accessed in modules.
+Documents are key-value data stored in collections. They can be accessed and manipulated using the Admin API or from within modules.
 
 ## Document Structure
 
 ```json
 {
     "id": "document1",
+    "namespace": "namespace1",
     "collection": "collection1",
     "data": {
         "field1": "value1",
-        "field2": "value2",
+        "field2": "value2"
     },
-    "namespace": "namespace1",
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
 }
 ```
 
@@ -25,24 +25,88 @@ Unlike other resources in DGate, documents do not have namespaces or tags. They 
 
 ### `id!`
 
-The unique identifier of the document.
+The unique identifier of the document within its collection.
 
-### `data!`
-
-The data of the document. This can be any type of data, including strings, numbers, arrays, and objects.
-
-### `namespace`
+### `namespace!`
 
 The namespace that the document belongs to.
 
-### `collection`
+### `collection!`
 
 The collection that the document belongs to.
 
-### `createdAt`
+### `data!`
 
-The time the document was created. (read-only)
+The data of the document. This can be any JSON-serializable data, including strings, numbers, booleans, arrays, and objects.
 
-### `updatedAt`
+### `created_at`
 
-The time the document was last updated. (read-only)
+The time the document was created. (read-only, auto-generated)
+
+### `updated_at`
+
+The time the document was last updated. (read-only, auto-updated)
+
+## Examples
+
+### Create a Document via Admin API
+
+```bash
+curl -X PUT http://localhost:9080/api/v1/document/default/users/user-123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {
+      "name": "John Doe",
+      "email": "john@example.com",
+      "active": true
+    }
+  }'
+```
+
+### Get a Document
+
+```bash
+curl http://localhost:9080/api/v1/document/default/users/user-123
+```
+
+### List Documents in a Collection
+
+```bash
+curl 'http://localhost:9080/api/v1/document?namespace=default&collection=users'
+```
+
+### Delete a Document
+
+```bash
+curl -X DELETE http://localhost:9080/api/v1/document/default/users/user-123
+```
+
+## Accessing Documents from Modules
+
+Modules can interact with documents using the context methods:
+
+```javascript
+function requestHandler(ctx) {
+    // Get a document
+    var doc = ctx.getDocument("users", "user-123");
+    if (doc && doc.data) {
+        ctx.json(doc.data);
+        return;
+    }
+    
+    // Create or update a document
+    ctx.setDocument("users", "user-456", {
+        name: "Jane Doe",
+        email: "jane@example.com"
+    });
+    
+    // Delete a document
+    ctx.deleteDocument("users", "old-user");
+    
+    ctx.json({ success: true });
+}
+```
+
+Note: Modules can only access documents in collections that are accessible based on the collection's visibility rules:
+- **Private collections**: Only modules in the same namespace can access
+- **Public collections**: Modules from any namespace can access

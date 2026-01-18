@@ -3,9 +3,9 @@ id: intro
 title: Introduction
 ---
 
-Introducing DGate - A Function Native API Gateway! DGate stands apart as a modular solution. Crafted for speed, efficiency, and seamless usability, redefining how you think of building your infrastructure. What sets DGate apart is its dynamic module support - empowering you to write scripts and apply them instantly, no more server restarts for updating modules.
+Introducing DGate v2 - A Function Native API Gateway built with Rust! DGate stands apart as a modular, high-performance solution. Crafted for speed, efficiency, and seamless usability, redefining how you think of building your infrastructure. What sets DGate apart is its dynamic module support - empowering you to write JavaScript scripts and apply them instantly, no more server restarts for updating modules.
 
-Function Native means that the functions/modules executed *inside* of the API Gateway. This allows for a more efficient way of executing functions. No need for separate servers when working with simple workloads. For example, webhooks, data manipulation, combining/chaining multiple requests, etc.
+Function Native means that the functions/modules are executed *inside* of the API Gateway using the QuickJS JavaScript engine. This allows for a more efficient way of executing functions. No need for separate servers when working with simple workloads. For example, webhooks, data manipulation, combining/chaining multiple requests, etc.
 
 ## API Gateways
 
@@ -17,7 +17,7 @@ API Gateways are common in microservice architectures. DGate, for example, can r
 
 DGate serves as a versatile API Gateway, equipped with a comprehensive range of functionalities typical for any modern API Gateway including the ability to manage api routes, domains, certs, services, and more.
 
-However, what sets DGate apart is its unique support for dynamic modules for such architectures that need must customization at L7.
+However, what sets DGate apart is its unique support for dynamic modules for such architectures that need customization at L7.
 
 Unlike traditional API Gateways, DGate empowers users to develop and integrate modules that can be dynamically loaded at runtime, eliminating the need for server restarts.
 
@@ -25,20 +25,20 @@ This groundbreaking feature enables the creation of custom modules tailored to m
 
 Whether it's authentication, logging, or implementing bespoke business logic, DGate's dynamic module support opens endless possibilities for customization.
 
-Moreover, DGate includes an Admin API for managment resources, powered by embedded [key-value database](https://github.com/dgraph-io/badger). With the Admin API, users gain the ability to create, update, delete, and view resources within their DGate environment. Furthermore, the Admin API offers insights into logs, statistics, and other vital information useful for monitoring and optimizing DGate performance.
+Moreover, DGate includes an Admin API for managing resources, powered by embedded [redb](https://github.com/cberner/redb) - a simple, portable, high-performance ACID database written in pure Rust. With the Admin API, users gain the ability to create, update, delete, and view resources within their DGate environment. Furthermore, the Admin API offers insights into logs, statistics, and other vital information useful for monitoring and optimizing DGate performance.
 
-DGate also offers replication capabilities for leveraging the [Raft consensus library](https://github.com/hashicorp/raft) created by HashiCorp. This functionality empowers users to deploy multiple DGate instances, ensuring automatic resource replication across all nodes. By harnessing the power of Raft consensus, DGate facilitates the creation of highly available and scalable API Gateway architectures, setting a new standard for reliability and performance in the realm of API management.
+DGate also offers replication capabilities leveraging the [openraft](https://github.com/databendlabs/openraft) Raft consensus library. This functionality empowers users to deploy multiple DGate instances, ensuring automatic resource replication across all nodes. By harnessing the power of Raft consensus, DGate facilitates the creation of highly available and scalable API Gateway architectures, setting a new standard for reliability and performance in the realm of API management.
 
 ### DGate Module Functions
 
-DGate modules are scripts that are run at runtime. Modules can be built in TypeScript or JavaScript. Modules can be used to modify the request or response or handle the request/response in certain functions depending on what variables are exposed.
+DGate modules are JavaScript scripts that are run at runtime. Modules can be used to modify the request or response or handle the request/response in certain functions depending on what variables are exposed.
 
 There are currently 5 module functions:
-- [`fetchUpstream`](/docs/resources/modules#fetchUpstream) - this module is used to select an upstream service URL
+- [`fetchUpstreamUrl`](/docs/resources/modules#fetchUpstreamUrl) - this module is used to select an upstream service URL
 - [`requestHandler`](/docs/resources/modules#requestHandler) - this module is used to handle the request, instead of using a service.
 - [`errorHandler`](/docs/resources/modules#errorHandler) - this module is used to handle errors (network, timeouts, etc.).
-- [`responseModifier`](/docs/resources/modules#responseModifier) - this module is used to modify the request before it is sent to the upstream service (or before it is handled by the requestHandler).
-- [`requestModifier`](/docs/resources/modules#requestModifier) - this module is used to modify the response before it is sent to the client.
+- [`requestModifier`](/docs/resources/modules#requestModifier) - this module is used to modify the request before it is sent to the upstream service (or before it is handled by the requestHandler).
+- [`responseModifier`](/docs/resources/modules#responseModifier) - this module is used to modify the response before it is sent to the client.
 
 ```mermaid
 sequenceDiagram
@@ -47,24 +47,24 @@ sequenceDiagram
     participant S1 as Service1
 
     C->>+G: server1 - /call1
-    Note right of G: fetchUpstream()
-    Note right of G: modifyRequest()
+    Note right of G: fetchUpstreamUrl()
+    Note right of G: requestModifier()
     G->>+S1: /call1
     S1-->>-G: resp1
     Note right of G: *errorHandler()
-    Note right of G: modifyReponse()
+    Note right of G: responseModifier()
     G-->>-C: resp1
 
     C->>+G: server1 - /call1
-    Note right of G: fetchUpstream()
-    Note right of G: modifyRequest()
+    Note right of G: fetchUpstreamUrl()
+    Note right of G: requestModifier()
     Note right of G: requestHandler()
     Note right of G: *errorHandler()
-    %% Note right of G: modifyReponse()
+    %% Note right of G: responseModifier()
     G-->>-C: resp1
 ```
 
-In the case of a non-HTTP error (network, timeout, etc.), the `errorHandler` will be called instead of the modifyResponse. However, if the retries are not exhausted, the `errorHandler` will not be called until the retries are exhausted.
+In the case of a non-HTTP error (network, timeout, etc.), the `errorHandler` will be called instead of the responseModifier. However, if the retries are not exhausted, the `errorHandler` will not be called until the retries are exhausted.
   
 ```mermaid
 sequenceDiagram
@@ -82,8 +82,54 @@ sequenceDiagram
 
 ### Why use DGate?
 
-DGate not only offers your system a secure, easy of use, flexible, and fault tolerant API Gateway, but also provides a dynamic module system that allows you to customize your API Gateway to your needs.
+DGate not only offers your system a secure, easy to use, flexible, and fault tolerant API Gateway, but also provides a dynamic module system that allows you to customize your API Gateway to your needs.
 
 This allows you to build a system that is tailored to your needs, and not the other way around.
 
-DGate is an attempt at managing software on the edge; including many featuresrollouts and rollbacks
+DGate is an attempt at managing software on the edge; including many features like rollouts and rollbacks.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        DGate v2                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   Domains   │───▶│  Namespaces │───▶│   Routes    │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│                                              │               │
+│                                              ▼               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   Modules   │◀───│   Handler   │───▶│  Services   │     │
+│  │  (QuickJS)  │    └─────────────┘    │  (Upstream) │     │
+│  └─────────────┘                       └─────────────┘     │
+│                                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  Documents  │    │   Secrets   │    │ Collections │     │
+│  │    (KV)     │    └─────────────┘    └─────────────┘     │
+│  └─────────────┘                                            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Key Technologies
+
+| Component | Technology |
+|-----------|------------|
+| Runtime | Rust with Tokio async runtime |
+| HTTP Server | axum / hyper |
+| JavaScript Engine | QuickJS (via rquickjs) |
+| Storage | redb (file) / in-memory |
+| Consensus | openraft |
+
+## Comparison with v1
+
+| Feature | v1 (Go) | v2 (Rust) |
+|---------|---------|-----------|
+| Runtime | Go 1.21+ | Rust 1.75+ |
+| JS Engine | goja | QuickJS (rquickjs) |
+| HTTP | chi/stdlib | axum/hyper |
+| Storage | badger/file | redb/memory |
+| Documents | JSON Schema | Simple KV |
+| Consensus | hashicorp/raft | openraft |

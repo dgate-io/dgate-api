@@ -1,11 +1,10 @@
 ---
 id: modules
 title: Modules
-tags: [javascript, typescript]
+tags: [javascript]
 ---
 
-Modules are used to extend the functionality of DGate. They are used to modify requests and responses, handle errors, and more. Modules are executed in a specific order, and each module has access to the context of the request and response.
-
+Modules are used to extend the functionality of DGate. They are used to modify requests and responses, handle errors, and more. Modules are executed using the QuickJS JavaScript engine and each module has access to the context of the request and response.
 
 ## Module Structure 
 
@@ -13,8 +12,8 @@ Modules are used to extend the functionality of DGate. They are used to modify r
 {
     "name": "module1",
     "namespace": "namespace1",
-    "payload": "const fetchUpstream = console.debug",
-    "type": "typescript",
+    "payload": "BASE64_ENCODED_JAVASCRIPT",
+    "moduleType": "javascript",
     "tags": ["tag1", "tag2"]
 }
 ```
@@ -31,83 +30,214 @@ The namespace that the module belongs to.
 
 ### `payload`
 
-The code that the module will execute. (base64 encoded)
+The JavaScript code that the module will execute. Must be base64 encoded.
 
-### `type`
+### `moduleType`
 
-The type of the module. (`typescript` or `javascript`)
+The type of the module. (`javascript` or `typescript`)
+
+Note: TypeScript modules are transpiled to JavaScript before execution.
 
 ### `tags`
 
-The tags associated with the module. Read me about tags [here](/docs/concepts/tags).
+The tags associated with the module. Read more about tags [here](/docs/concepts/tags).
+
+## Module Payload Options
+
+When defining modules in the configuration file, you have three options for specifying the code:
+
+1. **`payload`** - Base64 encoded JavaScript code
+2. **`payloadRaw`** - Plain text JavaScript code (automatically base64 encoded)
+3. **`payloadFile`** - Path to a file containing the module code (relative to config file)
+
+```yaml
+modules:
+  # Using payloadRaw (inline code)
+  - name: "health-check"
+    namespace: "default"
+    moduleType: javascript
+    payloadRaw: |
+      function requestHandler(ctx) {
+        ctx.json({ status: 'healthy' });
+      }
+  
+  # Using payloadFile (external file)
+  - name: "url-shortener"
+    namespace: "default"
+    moduleType: javascript
+    payloadFile: "modules/url_shortener.js"
+```
 
 ## Module Functions
 
-Currently, DGate supports the following modules:
-- ### Fetch Upstream Module \{#fetchUpstream} 
-  - `fetchUpstream` is executed before the proxy request is sent to the upstream server. This module is used to decide which upstream server URL.
+Currently, DGate supports the following module functions:
 
-- ### Request Modifier Module \{#requestModifier} 
-  - `requestModifier` is executed before the request is sent to the upstream server. This module is used to modify the request before it is sent to the upstream server.
+### Fetch Upstream URL \{#fetchUpstreamUrl}
 
-- ### Response Modifier Module \{#responseModifier} 
-  - `responseModifier` is executed after the response is received from the upstream server. This module is used to modify the response before it is sent to the client.
+`fetchUpstreamUrl` is executed before the proxy request is sent to the upstream server. This function is used to dynamically select which upstream server URL to use.
 
-- ### Error Handler Module \{#errorHandler} 
-  - `errorHandler` is executed when an error occurs when sending a request to the upstream server. This module is used to modify the response before it is sent to the client.
-
-- ### Request Handler Module \{#requestHandler} 
-  - `requestHandler` is executed when a request is received from the client. This module is used to handle arbitrary requests, instead of using an upstream service.
-
-## Exposing Functions
-
-To ensure that your module is triggered, you need to export or define the function name in the _first_ module in the route configuration.
-
-```typescript
-export const fetchUpstream = async (ctx: ModuleContext) => {
-  // Your code here
-}
-const requestModifier = async (ctx: ModuleContext) => {
-  // Your code here
+```javascript
+function fetchUpstreamUrl(ctx) {
+    // Return a custom upstream URL
+    return 'http://custom-backend:8080';
 }
 ```
 
-In the code above, both `fetchUpstream` and `requestModifier` are defined in the same module. Even though `requestModifier` is not exported, it will still be triggered when the module is executed.
+### Request Modifier \{#requestModifier}
 
+`requestModifier` is executed before the request is sent to the upstream server. This function is used to modify the request before it is forwarded.
+
+```javascript
+function requestModifier(ctx) {
+    // Add custom headers
+    ctx.request.headers['X-Custom-Header'] = 'value';
+    
+    // Modify the path
+    ctx.request.path = '/api/v2' + ctx.request.path;
+}
+```
+
+### Response Modifier \{#responseModifier}
+
+`responseModifier` is executed after the response is received from the upstream server. This function is used to modify the response before it is sent to the client.
+
+```javascript
+function responseModifier(ctx, res) {
+    // Add headers to response
+    res.headers['X-Processed'] = 'true';
+    
+    // Modify status code
+    // res.statusCode = 200;
+}
+```
+
+### Error Handler \{#errorHandler}
+
+`errorHandler` is executed when a non-HTTP error occurs (network errors, timeouts, etc.). This function is used to return a custom error response.
+
+```javascript
+function errorHandler(ctx, error) {
+    ctx.setStatus(503);
+    ctx.json({
+        error: 'Service temporarily unavailable',
+        message: error.message
+    });
+}
+```
+
+### Request Handler \{#requestHandler}
+
+`requestHandler` is executed when a request is received from the client. This function handles the request directly without forwarding to an upstream service - perfect for serverless-style functions.
+
+```javascript
+function requestHandler(ctx) {
+    ctx.setStatus(200);
+    ctx.json({
+        message: 'Hello from DGate!',
+        method: ctx.request.method,
+        path: ctx.request.path
+    });
+}
+```
+
+## Context Object
+
+The context object (`ctx`) provides access to request data and response methods.
+
+### Request Properties
+
+```javascript
+ctx.request.method     // HTTP method (GET, POST, etc.)
+ctx.request.path       // Request path
+ctx.request.query      // Query parameters object
+ctx.request.headers    // Request headers object
+ctx.request.body       // Request body (string)
+ctx.params             // Path parameters object
+ctx.route              // Route name
+ctx.namespace          // Namespace name
+ctx.service            // Service name (if any)
+```
+
+### Response Methods
+
+```javascript
+ctx.setStatus(code)           // Set HTTP status code
+ctx.setHeader(name, value)    // Set response header
+ctx.write(data)               // Write to response body
+ctx.json(data)                // Send JSON response
+ctx.redirect(url, status)     // Redirect to URL (default status: 302)
+ctx.status(code)              // Set status and return ctx for chaining
+```
+
+### Helper Methods
+
+```javascript
+ctx.pathParam('name')         // Get path parameter value
+ctx.queryParam('name')        // Get query parameter value
+```
+
+### Document Storage Methods
+
+Modules can read and write documents within their namespace:
+
+```javascript
+ctx.getDocument(collection, id)       // Get document by collection and ID
+ctx.setDocument(collection, id, data) // Create/update document
+ctx.deleteDocument(collection, id)    // Delete document
+```
+
+## Complete Example
+
+Here's a complete example of a request handler module:
+
+```javascript
+function requestHandler(ctx) {
+    var req = ctx.request;
+    var method = req.method;
+    
+    if (method === "GET") {
+        var id = ctx.pathParam("id");
+        if (!id) {
+            ctx.status(400).json({ error: "id is required" });
+            return;
+        }
+        
+        var doc = ctx.getDocument("items", id);
+        if (!doc) {
+            ctx.status(404).json({ error: "Not found" });
+            return;
+        }
+        
+        ctx.json(doc.data);
+        
+    } else if (method === "POST") {
+        var body = JSON.parse(req.body || "{}");
+        var id = body.id || ctx.hashString(JSON.stringify(body));
+        
+        ctx.setDocument("items", id, body);
+        ctx.status(201).json({ id: id });
+        
+    } else {
+        ctx.status(405).json({ error: "Method not allowed" });
+    }
+}
+```
 
 ## Multiple Modules
 
-Modules can be imported and used in other modules. However, only the functions defined or export in the _first_ module in the route configuration will be triggered.
+Routes can have multiple modules attached. Modules are executed in order, and all module functions are combined.
 
-```typescript title="main.ts"
-import { requestModifier as reqMod } from './custom'
-export { fetchUpstream } from './custom'
-const requestModifier = async (ctx: ModuleContext) => {
-    console.info("id", ctx.id, JSON.stringify(ctx));
-    return reqMod(ctx);
-}
+```yaml
+routes:
+  - name: "api-route"
+    namespace: "default"
+    paths: ["/api/**"]
+    methods: ["*"]
+    modules: ["auth-module", "logging-module", "handler-module"]
 ```
 
-```typescript title="custom.ts"
-export const fetchUpstream = async (ctx: ModuleContext) => {
-  // Your code here
-}
+Only functions defined in the combined module code will be executed. For example, if both `auth-module` and `handler-module` define `requestHandler`, only the last definition will be used.
 
-export const requestModifier = async (ctx: ModuleContext) => {
-  // Your code here
-}
-
-export const responseModifier = async (ctx: ModuleContext) => {
-  // Your code here
-}
-```
-
-```json title="Route Config"
-{
-    "path": "/",
-    "method": "GET",
-    "modules": ["main", "custom"]
-}
-```
-
-In the code above, because main is the first module in the route configuration, only the `fetchUpstream` and `requestModifier` functions will be triggered. The `responseModifier` function will not be triggered because it is exported to the `main` module.
+:::tip
+For complex module setups, structure your code so that the main logic module is listed last in the modules array, and utility/middleware modules are listed first.
+:::

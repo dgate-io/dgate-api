@@ -4,20 +4,19 @@ title: Namespaces
 icon: img/icons/namespaces.svg
 ---
 
-Namespaces are a way to organize your resources in DGate. They are used to group resources together and provide a way to manage access control and policies for those resources.
+Namespaces are a way to organize your resources in DGate. They are used to group resources together and provide isolation between different applications or environments.
 
-Each resource in DGate belongs to a namespace (except [Documents](/docs/resources/documents)). Resource that are not in the same namespace cannot be accessed by each other.
-
-Each resource that has a namespace also has tags, namespaces also have tags.
-
-At the moment, tags don't have much functionality, but they may be used in the future for permissions, canary, server tag based resource management, etc.
+Each resource in DGate belongs to a namespace. Resources in different namespaces are isolated from each other:
+- Routes in namespace A cannot use services from namespace B
+- Modules in namespace A cannot access private collections from namespace B
+- Domains route traffic to a specific namespace
 
 ## Namespace Structure
 
 ```json
 {
     "name": "namespace1",
-    "tags": ["tag1", "tag2"],
+    "tags": ["tag1", "tag2"]
 }
 ```
 
@@ -25,8 +24,80 @@ At the moment, tags don't have much functionality, but they may be used in the f
 
 ### `name!`
 
-The name of the namespace.
+The name of the namespace. Must be unique across the DGate instance.
 
 ### `tags`
 
 The tags associated with the namespace. Read more about tags [here](/docs/concepts/tags).
+
+Tags can be used for:
+- Organizing and filtering namespaces
+- Future use cases like canary deployments and access control
+
+## Default Namespace
+
+DGate automatically creates a `default` namespace unless disabled in configuration:
+
+```yaml
+disable_default_namespace: true
+```
+
+## Examples
+
+### Create a Namespace via Admin API
+
+```bash
+curl -X PUT http://localhost:9080/api/v1/namespace/myapp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tags": ["production", "v2"]
+  }'
+```
+
+### List Namespaces
+
+```bash
+curl http://localhost:9080/api/v1/namespace
+```
+
+### Delete a Namespace
+
+```bash
+curl -X DELETE http://localhost:9080/api/v1/namespace/myapp
+```
+
+Note: Deleting a namespace will also delete all resources within it (routes, services, modules, domains, collections, documents, secrets).
+
+### Configuration File
+
+```yaml
+proxy:
+  init_resources:
+    namespaces:
+      - name: "production"
+        tags: ["prod"]
+      - name: "staging"
+        tags: ["staging", "test"]
+```
+
+## Multi-tenancy with Namespaces
+
+Namespaces are ideal for multi-tenant setups:
+
+```yaml
+namespaces:
+  - name: "tenant-a"
+    tags: ["tenant"]
+  - name: "tenant-b"
+    tags: ["tenant"]
+
+domains:
+  - name: "tenant-a-domain"
+    namespace: "tenant-a"
+    patterns: ["a.example.com"]
+  - name: "tenant-b-domain"
+    namespace: "tenant-b"
+    patterns: ["b.example.com"]
+```
+
+Each tenant's traffic is isolated to their own namespace with their own routes, services, and data.
