@@ -808,8 +808,7 @@ impl ProxyState {
                     .handle_grpc_proxy(req, service, &compiled_route, start)
                     .await;
             } else {
-                return (StatusCode::BAD_GATEWAY, "No upstream service for gRPC")
-                    .into_response();
+                return (StatusCode::BAD_GATEWAY, "No upstream service for gRPC").into_response();
             }
         }
 
@@ -1388,7 +1387,10 @@ impl ProxyState {
         let upstream_url = match service.urls.first() {
             Some(url) => url.clone(),
             None => {
-                error!("No upstream URLs configured for gRPC service: {}", service.name);
+                error!(
+                    "No upstream URLs configured for gRPC service: {}",
+                    service.name
+                );
                 return (StatusCode::BAD_GATEWAY, "No upstream configured").into_response();
             }
         };
@@ -1472,8 +1474,12 @@ impl ProxyState {
         }
 
         // Build query string
-        let query_string = req.uri().query().map(|q| format!("?{}", q)).unwrap_or_default();
-        
+        let query_string = req
+            .uri()
+            .query()
+            .map(|q| format!("?{}", q))
+            .unwrap_or_default();
+
         // Build full URI with scheme and authority (required for h2 client)
         let full_uri = format!("http://{}{}{}", addr, target_path, query_string);
 
@@ -1521,9 +1527,10 @@ impl ProxyState {
 
         // Determine if we should end the stream immediately (no body) or send body
         let end_of_stream = body_bytes.is_empty();
-        
+
         // Send the request
-        let (response_future, mut send_stream) = match h2_client.send_request(h2_req, end_of_stream) {
+        let (response_future, mut send_stream) = match h2_client.send_request(h2_req, end_of_stream)
+        {
             Ok(r) => r,
             Err(e) => {
                 error!("Failed to send HTTP/2 request: {}", e);
@@ -1535,7 +1542,7 @@ impl ProxyState {
         if !body_bytes.is_empty() {
             // Reserve capacity for the body data
             send_stream.reserve_capacity(body_bytes.len());
-            
+
             // Wait for capacity to be available
             match futures_util::future::poll_fn(|cx| send_stream.poll_capacity(cx)).await {
                 Some(Ok(_)) => {}
@@ -1548,7 +1555,7 @@ impl ProxyState {
                     return (StatusCode::BAD_GATEWAY, "Stream closed").into_response();
                 }
             }
-            
+
             // Send the body data
             if let Err(e) = send_stream.send_data(body_bytes.clone(), true) {
                 error!("Failed to send request body: {}", e);
@@ -1614,12 +1621,12 @@ impl ProxyState {
             // Create a stream that sends data frames and then trailers
             let data_frame = Frame::data(Bytes::from(response_data));
             let trailers_frame = Frame::trailers(trailers);
-            
+
             let frames = vec![
                 Ok::<_, std::convert::Infallible>(data_frame),
                 Ok(trailers_frame),
             ];
-            
+
             let stream = futures_util::stream::iter(frames);
             let stream_body = StreamBody::new(stream);
             Body::new(stream_body)
@@ -1627,11 +1634,9 @@ impl ProxyState {
             Body::from(response_data)
         };
 
-        builder
-            .body(body)
-            .unwrap_or_else(|_| {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
-            })
+        builder.body(body).unwrap_or_else(|_| {
+            (StatusCode::INTERNAL_SERVER_ERROR, "Response build error").into_response()
+        })
     }
 
     /// Get all documents for a namespace (for module access)

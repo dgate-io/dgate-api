@@ -174,6 +174,14 @@ pub fn create_router(state: AdminState) -> Router {
             "/internal",
             Router::new().route("/replicate", post(internal_replicate)),
         )
+        // Raft RPC endpoints for cluster communication
+        .nest(
+            "/raft",
+            Router::new()
+                .route("/vote", post(raft_vote))
+                .route("/append", post(raft_append_entries))
+                .route("/snapshot", post(raft_install_snapshot)),
+        )
         .with_state(state)
 }
 
@@ -956,6 +964,8 @@ async fn cluster_remove_member(
 // Internal handlers for cluster replication
 
 /// Internal endpoint for receiving replicated changes from other cluster nodes
+/// Note: This is for backward compatibility with simple replication mode.
+/// In full Raft mode, changes are replicated via the Raft protocol endpoints.
 async fn internal_replicate(
     State(state): State<AdminState>,
     Json(changelog): Json<ChangeLog>,
@@ -966,14 +976,84 @@ async fn internal_replicate(
         .cluster()
         .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
 
-    // Apply the replicated changelog without re-replicating
-    let response = cluster.apply_replicated(&changelog);
-
-    if response.success {
-        Ok(Json(ApiResponse::success(())))
-    } else {
-        Err(ApiError::internal(response.message.unwrap_or_else(|| {
-            "Failed to apply replicated change".to_string()
-        })))
+    // In Raft mode, propose the change through Raft consensus
+    match cluster.propose(changelog).await {
+        Ok(response) => {
+            if response.success {
+                Ok(Json(ApiResponse::success(())))
+            } else {
+                Err(ApiError::internal(response.message.unwrap_or_else(|| {
+                    "Failed to apply replicated change".to_string()
+                })))
+            }
+        }
+        Err(e) => Err(ApiError::internal(format!("Raft propose failed: {}", e))),
     }
+}
+
+// Raft RPC handlers for cluster communication
+//
+// These handlers receive Raft protocol messages from other cluster nodes
+// and forward them to the local Raft instance.
+//
+// Note: In openraft 0.9, VoteRequest/VoteResponse use NodeId,
+// while AppendEntriesRequest/InstallSnapshotRequest use TypeConfig.
+
+use crate::cluster::{NodeId, TypeConfig};
+
+/// Handle Raft vote requests from other nodes
+async fn raft_vote(
+    State(state): State<AdminState>,
+    Json(req): Json<openraft::raft::VoteRequest<NodeId>>,
+) -> Result<Json<openraft::raft::VoteResponse<NodeId>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    let response = cluster
+        .raft()
+        .vote(req)
+        .await
+        .map_err(|e| ApiError::internal(format!("Vote failed: {}", e)))?;
+
+    Ok(Json(response))
+}
+
+/// Handle Raft append entries requests from leader
+async fn raft_append_entries(
+    State(state): State<AdminState>,
+    Json(req): Json<openraft::raft::AppendEntriesRequest<TypeConfig>>,
+) -> Result<Json<openraft::raft::AppendEntriesResponse<NodeId>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    let response = cluster
+        .raft()
+        .append_entries(req)
+        .await
+        .map_err(|e| ApiError::internal(format!("Append entries failed: {}", e)))?;
+
+    Ok(Json(response))
+}
+
+/// Handle Raft snapshot installation from leader
+async fn raft_install_snapshot(
+    State(state): State<AdminState>,
+    Json(req): Json<openraft::raft::InstallSnapshotRequest<TypeConfig>>,
+) -> Result<Json<openraft::raft::InstallSnapshotResponse<NodeId>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    let response = cluster
+        .raft()
+        .install_snapshot(req)
+        .await
+        .map_err(|e| ApiError::internal(format!("Install snapshot failed: {}", e)))?;
+
+    Ok(Json(response))
 }

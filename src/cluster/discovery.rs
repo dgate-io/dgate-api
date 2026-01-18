@@ -92,6 +92,7 @@ impl NodeDiscovery {
     }
 
     /// Run a simplified discovery loop
+    #[allow(dead_code)]
     pub async fn run_discovery_loop_simple(&self) {
         let refresh_interval = Duration::from_secs(self.config.refresh_interval_secs);
         let mut ticker = interval(refresh_interval);

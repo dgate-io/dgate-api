@@ -59,6 +59,7 @@ pub struct RaftNetwork {
 
 impl RaftNetwork {
     fn endpoint(&self, path: &str) -> String {
+        // The addr should point to the admin API (e.g., "127.0.0.1:9080")
         format!("http://{}/raft{}", self.addr, path)
     }
 }
@@ -68,8 +69,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
         &mut self,
         req: AppendEntriesRequest<TypeConfig>,
         _option: RPCOption,
-    ) -> Result<AppendEntriesResponse<TypeConfig>, RPCError<NodeId, BasicNode, RaftError<NodeId>>>
-    {
+    ) -> Result<AppendEntriesResponse<NodeId>, RPCError<NodeId, BasicNode, RaftError<NodeId>>> {
         debug!("Sending append_entries to node {}", self.target);
 
         let url = self.endpoint("/append");
@@ -96,7 +96,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
             )));
         }
 
-        let result: AppendEntriesResponse<TypeConfig> = resp
+        let result: AppendEntriesResponse<NodeId> = resp
             .json()
             .await
             .map_err(|e| RPCError::Network(openraft::error::NetworkError::new(&e)))?;
@@ -109,7 +109,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
         req: InstallSnapshotRequest<TypeConfig>,
         _option: RPCOption,
     ) -> Result<
-        InstallSnapshotResponse<TypeConfig>,
+        InstallSnapshotResponse<NodeId>,
         RPCError<NodeId, BasicNode, RaftError<NodeId, InstallSnapshotError>>,
     > {
         debug!("Sending install_snapshot to node {}", self.target);
@@ -138,7 +138,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
             )));
         }
 
-        let result: InstallSnapshotResponse<TypeConfig> = resp
+        let result: InstallSnapshotResponse<NodeId> = resp
             .json()
             .await
             .map_err(|e| RPCError::Network(openraft::error::NetworkError::new(&e)))?;
@@ -148,9 +148,9 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
 
     async fn vote(
         &mut self,
-        req: VoteRequest<TypeConfig>,
+        req: VoteRequest<NodeId>,
         _option: RPCOption,
-    ) -> Result<VoteResponse<TypeConfig>, RPCError<NodeId, BasicNode, RaftError<NodeId>>> {
+    ) -> Result<VoteResponse<NodeId>, RPCError<NodeId, BasicNode, RaftError<NodeId>>> {
         debug!("Sending vote request to node {}", self.target);
 
         let url = self.endpoint("/vote");
@@ -174,7 +174,7 @@ impl RaftNetworkTrait<TypeConfig> for RaftNetwork {
             )));
         }
 
-        let result: VoteResponse<TypeConfig> = resp
+        let result: VoteResponse<NodeId> = resp
             .json()
             .await
             .map_err(|e| RPCError::Network(openraft::error::NetworkError::new(&e)))?;

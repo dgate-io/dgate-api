@@ -1,41 +1,59 @@
 //! Cluster module for DGate
 //!
-//! Provides replication for resources and documents across multiple DGate nodes.
-//! Supports both static member configuration and DNS-based discovery.
+//! Provides replication for resources and documents across multiple DGate nodes
+//! using the Raft consensus protocol via openraft.
 //!
 //! # Architecture
 //!
-//! This module contains two implementation approaches:
+//! This module implements full Raft consensus with:
+//! - Leader election
+//! - Log replication
+//! - Snapshot transfer
+//! - Dynamic membership changes
 //!
-//! 1. **Simple HTTP Replication** (currently active in `mod.rs`):
-//!    - Uses direct HTTP calls to replicate changes to peer nodes
-//!    - All nodes can accept writes and replicate to others
-//!    - Simple and effective for most use cases
-//!
-//! 2. **Full Raft Consensus** (in `state_machine.rs` and `network.rs`):
-//!    - Complete openraft integration with leader election, log replication
-//!    - Provides stronger consistency guarantees
-//!    - Can be enabled by wiring up the openraft components
+//! Key components:
+//! - `TypeConfig`: Raft type configuration
+//! - `ClusterManager`: High-level cluster operations
+//! - `RaftLogStore`: In-memory log storage (in `store.rs`)
+//! - `DGateStateMachine`: State machine for applying logs (in `state_machine.rs`)
+//! - `NetworkFactory`: HTTP-based Raft networking (in `network.rs`)
 
 mod discovery;
+mod network;
+mod state_machine;
+mod store;
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::io::Cursor;
 use std::sync::Arc;
+use std::time::Duration;
 
-use openraft::BasicNode;
-use reqwest::Client;
+use openraft::raft::ClientWriteResponse;
+use openraft::Config as RaftConfig;
+use openraft::{BasicNode, ChangeMembers, Raft};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::config::{ClusterConfig, ClusterMember, ClusterMode};
 use crate::resources::ChangeLog;
-use crate::storage::ProxyStore;
 
 pub use discovery::NodeDiscovery;
+pub use network::NetworkFactory;
+pub use state_machine::DGateStateMachine;
+pub use store::RaftLogStore;
 
 /// Node ID type
 pub type NodeId = u64;
+
+// Raft type configuration using openraft's declarative macro
+openraft::declare_raft_types!(
+    pub TypeConfig:
+        D = ChangeLog,
+        R = ClientResponse,
+        Node = BasicNode,
+);
 
 /// Response from the state machine after applying a log entry
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -44,266 +62,14 @@ pub struct ClientResponse {
     pub message: Option<String>,
 }
 
-/// Snapshot data for state machine (used by openraft implementation in state_machine.rs)
-#[allow(dead_code)]
+/// Snapshot data for state machine
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SnapshotData {
     pub changelogs: Vec<ChangeLog>,
 }
 
-/// Raft type configuration (used by openraft implementation in state_machine.rs and network.rs)
-#[allow(dead_code)]
-pub struct TypeConfig;
-
-/// Simplified Raft instance for the HTTP replication approach.
-/// For full Raft consensus, see the openraft implementation in state_machine.rs and network.rs.
-pub struct DGateRaft {
-    node_id: NodeId,
-    members: RwLock<BTreeMap<NodeId, BasicNode>>,
-    leader_id: RwLock<Option<NodeId>>,
-}
-
-impl DGateRaft {
-    fn new(node_id: NodeId) -> Self {
-        Self {
-            node_id,
-            members: RwLock::new(BTreeMap::new()),
-            leader_id: RwLock::new(Some(node_id)), // Single node is leader
-        }
-    }
-
-    /// Get this node's ID
-    pub fn node_id(&self) -> NodeId {
-        self.node_id
-    }
-
-    pub async fn current_leader(&self) -> Option<NodeId> {
-        *self.leader_id.read().await
-    }
-
-    /// Handle a vote request (stub - full implementation in network.rs)
-    #[allow(dead_code)]
-    pub async fn vote(
-        &self,
-        _req: serde_json::Value,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(serde_json::json!({"vote_granted": true}))
-    }
-
-    /// Handle append entries request (stub - full implementation in network.rs)
-    #[allow(dead_code)]
-    pub async fn append_entries(
-        &self,
-        _req: serde_json::Value,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(serde_json::json!({"success": true}))
-    }
-
-    /// Handle install snapshot request (stub - full implementation in network.rs)
-    #[allow(dead_code)]
-    pub async fn install_snapshot(
-        &self,
-        _req: serde_json::Value,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(serde_json::json!({"success": true}))
-    }
-}
-
-/// State machine for applying Raft log entries
-pub struct DGateStateMachine {
-    store: Arc<ProxyStore>,
-    change_tx: Option<tokio::sync::mpsc::UnboundedSender<ChangeLog>>,
-}
-
-impl DGateStateMachine {
-    /// Create a new state machine (without change notifications)
-    #[allow(dead_code)]
-    pub fn new(store: Arc<ProxyStore>) -> Self {
-        Self {
-            store,
-            change_tx: None,
-        }
-    }
-
-    /// Create a new state machine with a change notification channel
-    pub fn with_change_notifier(
-        store: Arc<ProxyStore>,
-        change_tx: tokio::sync::mpsc::UnboundedSender<ChangeLog>,
-    ) -> Self {
-        Self {
-            store,
-            change_tx: Some(change_tx),
-        }
-    }
-
-    /// Apply a changelog to storage and notify listeners
-    pub fn apply(&self, changelog: &ChangeLog) -> ClientResponse {
-        use crate::resources::*;
-
-        // Apply the change to storage
-        let result = match changelog.cmd {
-            ChangeCommand::AddNamespace => {
-                let ns: Namespace = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(ns) => ns,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_namespace(&ns).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteNamespace => self
-                .store
-                .delete_namespace(&changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddRoute => {
-                let route: Route = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_route(&route).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteRoute => self
-                .store
-                .delete_route(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddService => {
-                let service: Service = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_service(&service).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteService => self
-                .store
-                .delete_service(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddModule => {
-                let module: Module = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_module(&module).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteModule => self
-                .store
-                .delete_module(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddDomain => {
-                let domain: Domain = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_domain(&domain).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteDomain => self
-                .store
-                .delete_domain(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddSecret => {
-                let secret: Secret = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store.set_secret(&secret).map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteSecret => self
-                .store
-                .delete_secret(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddCollection => {
-                let collection: Collection = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store
-                    .set_collection(&collection)
-                    .map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteCollection => self
-                .store
-                .delete_collection(&changelog.namespace, &changelog.name)
-                .map_err(|e| e.to_string()),
-            ChangeCommand::AddDocument => {
-                let document: Document = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store
-                    .set_document(&document)
-                    .map_err(|e| e.to_string())
-            }
-            ChangeCommand::DeleteDocument => {
-                let doc: Document = match serde_json::from_value(changelog.item.clone()) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        return ClientResponse {
-                            success: false,
-                            message: Some(e.to_string()),
-                        }
-                    }
-                };
-                self.store
-                    .delete_document(&changelog.namespace, &doc.collection, &changelog.name)
-                    .map_err(|e| e.to_string())
-            }
-        };
-
-        if let Err(e) = result {
-            return ClientResponse {
-                success: false,
-                message: Some(e),
-            };
-        }
-
-        // Notify proxy about the change
-        if let Some(ref tx) = self.change_tx {
-            let _ = tx.send(changelog.clone());
-        }
-
-        ClientResponse {
-            success: true,
-            message: Some("Applied".to_string()),
-        }
-    }
-}
+/// The Raft instance type alias for convenience
+pub type DGateRaft = Raft<TypeConfig>;
 
 /// Cluster metrics for admin API
 #[derive(Debug, Clone, Serialize)]
@@ -315,26 +81,23 @@ pub struct ClusterMetrics {
     pub last_applied: Option<u64>,
     pub committed: Option<u64>,
     pub members: Vec<ClusterMember>,
+    pub state: String,
 }
 
 /// Cluster manager handles all cluster operations
 pub struct ClusterManager {
     /// Configuration
     config: ClusterConfig,
-    /// The Raft instance
+    /// The real Raft instance
     raft: Arc<DGateRaft>,
-    /// State machine
-    state_machine: Arc<DGateStateMachine>,
     /// Node discovery service
     discovery: Option<Arc<NodeDiscovery>>,
-    /// Indicates if this node is the leader
-    is_leader: Arc<RwLock<bool>>,
-    /// HTTP client for replication
-    http_client: Client,
+    /// Cached members list (updated from Raft metrics)
+    cached_members: RwLock<Vec<ClusterMember>>,
 }
 
 impl ClusterManager {
-    /// Create a new cluster manager
+    /// Create a new cluster manager with full Raft consensus
     pub async fn new(
         cluster_config: ClusterConfig,
         state_machine: Arc<DGateStateMachine>,
@@ -347,8 +110,37 @@ impl ClusterManager {
             node_id, cluster_config.advertise_addr, mode
         );
 
-        // Create simplified Raft instance
-        let raft = Arc::new(DGateRaft::new(node_id));
+        // Create Raft configuration
+        let raft_config = RaftConfig {
+            cluster_name: "dgate-cluster".to_string(),
+            heartbeat_interval: 200,
+            election_timeout_min: 500,
+            election_timeout_max: 1000,
+            // Enable automatic snapshot when log grows
+            snapshot_policy: openraft::SnapshotPolicy::LogsSinceLast(1000),
+            max_in_snapshot_log_to_keep: 100,
+            ..Default::default()
+        };
+
+        let raft_config = Arc::new(raft_config.validate()?);
+
+        // Create log store
+        let log_store = RaftLogStore::new();
+
+        // Create network factory
+        let network_factory = NetworkFactory::new();
+
+        // Create the Raft instance
+        let raft = Raft::new(
+            node_id,
+            raft_config,
+            network_factory,
+            log_store,
+            state_machine.as_ref().clone(),
+        )
+        .await?;
+
+        let raft = Arc::new(raft);
 
         // Setup discovery if configured
         let discovery = cluster_config
@@ -356,31 +148,18 @@ impl ClusterManager {
             .as_ref()
             .map(|disc_config| Arc::new(NodeDiscovery::new(disc_config.clone())));
 
-        // Create HTTP client for replication
-        let http_client = Client::builder()
-            .pool_max_idle_per_host(10)
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-            .expect("Failed to create HTTP client");
-
-        // In simple mode, all nodes are leaders (can accept writes)
-        // In raft mode, only the bootstrap node starts as leader
-        let is_leader = match mode {
-            ClusterMode::Simple => true, // All nodes can accept writes
-            ClusterMode::Raft => cluster_config.bootstrap, // Only bootstrap node starts as leader
-        };
+        // Cache initial members from config
+        let cached_members = RwLock::new(cluster_config.initial_members.clone());
 
         Ok(Self {
             config: cluster_config,
             raft,
-            state_machine,
             discovery,
-            is_leader: Arc::new(RwLock::new(is_leader)),
-            http_client,
+            cached_members,
         })
     }
 
-    /// Initialize the cluster
+    /// Initialize the cluster - bootstrap or join existing cluster
     pub async fn initialize(&self) -> anyhow::Result<()> {
         let node_id = self.config.node_id;
         let mode = self.config.mode;
@@ -391,26 +170,25 @@ impl ClusterManager {
                     "Initializing simple replication cluster with node_id={}",
                     node_id
                 );
-                // In simple mode, all nodes are peers and can accept writes
-                *self.is_leader.write().await = true;
+                // In simple mode, just bootstrap as a single-node cluster
+                self.bootstrap_single_node().await?;
             }
             ClusterMode::Raft => {
                 if self.config.bootstrap {
                     info!(
-                        "Bootstrapping Raft cluster with node_id={} as leader",
+                        "Bootstrapping Raft cluster with node_id={} as initial leader",
                         node_id
                     );
-                    *self.is_leader.write().await = true;
+                    self.bootstrap_cluster().await?;
                 } else if !self.config.initial_members.is_empty() {
                     info!(
-                        "Joining Raft cluster with {} members as follower",
+                        "Joining existing Raft cluster with {} known members",
                         self.config.initial_members.len()
                     );
-                    *self.is_leader.write().await = false;
-                    // In a full Raft implementation, would:
-                    // 1. Connect to existing cluster members
-                    // 2. Request to join the cluster
-                    // 3. Participate in leader election
+                    self.join_cluster().await?;
+                } else {
+                    warn!("No bootstrap flag and no initial members - starting as isolated node");
+                    self.bootstrap_single_node().await?;
                 }
             }
         }
@@ -418,166 +196,293 @@ impl ClusterManager {
         // Start discovery background task if configured
         if let Some(ref discovery) = self.discovery {
             let discovery_clone = discovery.clone();
+            let raft_clone = self.raft.clone();
+            let my_node_id = self.config.node_id;
             tokio::spawn(async move {
-                discovery_clone.run_discovery_loop_simple().await;
+                Self::run_discovery_loop(discovery_clone, raft_clone, my_node_id).await;
             });
         }
 
         Ok(())
     }
 
+    /// Bootstrap this node as a single-node cluster (becomes leader immediately)
+    async fn bootstrap_single_node(&self) -> anyhow::Result<()> {
+        let node_id = self.config.node_id;
+        let mut members = BTreeMap::new();
+        members.insert(
+            node_id,
+            BasicNode {
+                addr: self.config.advertise_addr.clone(),
+            },
+        );
+
+        match self.raft.initialize(members).await {
+            Ok(_) => {
+                info!("Successfully bootstrapped single-node cluster");
+                Ok(())
+            }
+            Err(e) => {
+                // If already initialized, that's fine
+                if e.to_string().contains("already initialized") {
+                    debug!("Cluster already initialized");
+                    Ok(())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
+    }
+
+    /// Bootstrap as the initial leader with configured members
+    async fn bootstrap_cluster(&self) -> anyhow::Result<()> {
+        let node_id = self.config.node_id;
+        let mut members = BTreeMap::new();
+
+        // Add self first
+        members.insert(
+            node_id,
+            BasicNode {
+                addr: self.config.advertise_addr.clone(),
+            },
+        );
+
+        // Add other initial members
+        for member in &self.config.initial_members {
+            if member.id != node_id {
+                members.insert(
+                    member.id,
+                    BasicNode {
+                        addr: member.addr.clone(),
+                    },
+                );
+            }
+        }
+
+        info!("Bootstrapping cluster with {} members", members.len());
+
+        match self.raft.initialize(members).await {
+            Ok(_) => {
+                info!("Successfully bootstrapped cluster as leader");
+                Ok(())
+            }
+            Err(e) => {
+                if e.to_string().contains("already initialized") {
+                    debug!("Cluster already initialized");
+                    Ok(())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
+    }
+
+    /// Join an existing cluster by contacting known members
+    async fn join_cluster(&self) -> anyhow::Result<()> {
+        let node_id = self.config.node_id;
+        let my_addr = &self.config.advertise_addr;
+
+        info!(
+            "Attempting to join cluster as node {} at {}",
+            node_id, my_addr
+        );
+
+        // Try to contact each known member and request to be added
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()?;
+
+        for member in &self.config.initial_members {
+            if member.id == node_id {
+                continue; // Skip self
+            }
+
+            let url = format!("http://{}/api/v1/cluster/members/{}", member.addr, node_id);
+
+            info!(
+                "Requesting to join cluster via member {} at {}",
+                member.id, member.addr
+            );
+
+            let result = client
+                .put(&url)
+                .json(&serde_json::json!({
+                    "addr": my_addr
+                }))
+                .send()
+                .await;
+
+            match result {
+                Ok(resp) if resp.status().is_success() => {
+                    info!("Successfully joined cluster via node {}", member.id);
+                    return Ok(());
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    warn!(
+                        "Failed to join via node {}: {} - {}",
+                        member.id, status, body
+                    );
+                }
+                Err(e) => {
+                    warn!("Failed to contact node {}: {}", member.id, e);
+                }
+            }
+        }
+
+        // If we couldn't join any existing cluster, wait for someone to add us
+        warn!("Could not join any existing cluster member - waiting to be added");
+        Ok(())
+    }
+
+    /// Discovery loop that periodically checks for new nodes
+    async fn run_discovery_loop(
+        discovery: Arc<NodeDiscovery>,
+        raft: Arc<DGateRaft>,
+        my_node_id: NodeId,
+    ) {
+        loop {
+            let nodes = discovery.discover().await;
+            for (node_id, node) in nodes {
+                // Try to add discovered nodes if we're the leader
+                let metrics = raft.metrics().borrow().clone();
+                if metrics.current_leader == Some(my_node_id) {
+                    let change =
+                        ChangeMembers::AddNodes([(node_id, node.clone())].into_iter().collect());
+
+                    match raft.change_membership(change, false).await {
+                        Ok(_) => info!("Added discovered node {} at {}", node_id, node.addr),
+                        Err(e) => debug!("Could not add node {}: {}", node_id, e),
+                    }
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+    }
+
     /// Get the cluster mode
+    #[allow(dead_code)]
     pub fn mode(&self) -> ClusterMode {
         self.config.mode
     }
 
     /// Check if this node is the current leader
     pub async fn is_leader(&self) -> bool {
-        *self.is_leader.read().await
+        let metrics = self.raft.metrics().borrow().clone();
+        metrics.current_leader == Some(self.config.node_id)
     }
 
     /// Get the current leader ID
     pub async fn leader_id(&self) -> Option<NodeId> {
-        self.raft.current_leader().await
+        self.raft.metrics().borrow().current_leader
     }
 
-    /// Propose a change log to the cluster
-    pub async fn propose(&self, changelog: ChangeLog) -> anyhow::Result<ClientResponse> {
-        // Apply the change locally first
-        let response = self.state_machine.apply(&changelog);
-
-        if !response.success {
-            return Ok(response);
-        }
-
-        // Replicate to other nodes
-        self.replicate_to_peers(&changelog).await;
-
-        Ok(response)
-    }
-
-    /// Replicate a changelog to all peer nodes
-    async fn replicate_to_peers(&self, changelog: &ChangeLog) {
-        let my_node_id = self.raft.node_id();
-
-        for member in &self.config.initial_members {
-            // Skip self
-            if member.id == my_node_id {
-                continue;
-            }
-
-            let admin_url = self.get_member_admin_url(member);
-            let url = format!("{}/internal/replicate", admin_url);
-
-            debug!(
-                "Replicating changelog {} to node {} at {}",
-                changelog.id, member.id, url
-            );
-
-            let client = self.http_client.clone();
-            let changelog_clone = changelog.clone();
-            let member_id = member.id;
-
-            // Spawn replication as background task to not block the response
-            tokio::spawn(async move {
-                match client.post(&url).json(&changelog_clone).send().await {
-                    Ok(resp) => {
-                        if resp.status().is_success() {
-                            debug!("Successfully replicated to node {}", member_id);
-                        } else {
-                            warn!(
-                                "Failed to replicate to node {}: status {}",
-                                member_id,
-                                resp.status()
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Failed to replicate to node {}: {}", member_id, e);
-                    }
-                }
-            });
-        }
-    }
-
-    /// Get the admin API URL for a cluster member
-    fn get_member_admin_url(&self, member: &ClusterMember) -> String {
-        let scheme = if member.tls { "https" } else { "http" };
-
-        // If admin_port is specified, use it
-        if let Some(admin_port) = member.admin_port {
-            // Extract host from addr (format: host:port)
-            let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
-            return format!("{}://{}:{}", scheme, host, admin_port);
-        }
-
-        // Otherwise, derive admin port from raft port (admin = raft - 10)
-        // This is a convention used in the test configuration
-        if let Some(port_str) = member.addr.split(':').next_back() {
-            if let Ok(raft_port) = port_str.parse::<u16>() {
-                let admin_port = raft_port.saturating_sub(10);
-                let host = member.addr.split(':').next().unwrap_or("127.0.0.1");
-                return format!("{}://{}:{}", scheme, host, admin_port);
-            }
-        }
-
-        // Fallback: use addr as-is (might not work)
-        format!("{}://{}", scheme, member.addr)
-    }
-
-    /// Apply a replicated changelog (from another node)
-    /// This applies the change locally without re-replicating
-    pub fn apply_replicated(&self, changelog: &ChangeLog) -> ClientResponse {
-        debug!(
-            "Applying replicated changelog {} from cluster peer",
-            changelog.id
-        );
-        self.state_machine.apply(changelog)
-    }
-
-    /// Get cluster metrics
-    pub async fn metrics(&self) -> ClusterMetrics {
-        ClusterMetrics {
-            id: self.raft.node_id(),
-            mode: self.config.mode,
-            is_leader: *self.is_leader.read().await,
-            current_term: Some(1),
-            last_applied: Some(0),
-            committed: Some(0),
-            members: self.config.initial_members.clone(),
-        }
-    }
-
-    /// Get cluster members (public API for external use)
-    #[allow(dead_code)]
-    pub fn members(&self) -> &[ClusterMember] {
-        &self.config.initial_members
-    }
-
-    /// Get the Raft instance for admin operations (public API for external use)
-    #[allow(dead_code)]
+    /// Get the Raft instance for direct access (e.g., for handling RPC requests)
     pub fn raft(&self) -> &Arc<DGateRaft> {
         &self.raft
     }
 
+    /// Propose a change log to the cluster via Raft consensus
+    pub async fn propose(&self, changelog: ChangeLog) -> anyhow::Result<ClientResponse> {
+        // Submit the changelog through Raft
+        let result: ClientWriteResponse<TypeConfig> = self
+            .raft
+            .client_write(changelog)
+            .await
+            .map_err(|e| anyhow::anyhow!("Raft write failed: {}", e))?;
+
+        Ok(result.data)
+    }
+
+    /// Get cluster metrics
+    pub async fn metrics(&self) -> ClusterMetrics {
+        let raft_metrics = self.raft.metrics().borrow().clone();
+        let members = self.cached_members.read().await.clone();
+
+        let state = match raft_metrics.state {
+            openraft::ServerState::Leader => "leader",
+            openraft::ServerState::Follower => "follower",
+            openraft::ServerState::Candidate => "candidate",
+            openraft::ServerState::Learner => "learner",
+            openraft::ServerState::Shutdown => "shutdown",
+        };
+
+        ClusterMetrics {
+            id: self.config.node_id,
+            mode: self.config.mode,
+            is_leader: raft_metrics.current_leader == Some(self.config.node_id),
+            current_term: Some(raft_metrics.vote.leader_id().term),
+            last_applied: raft_metrics.last_applied.map(|l| l.index),
+            committed: raft_metrics.last_applied.map(|l| l.index), // Use last_applied as committed approximation
+            members,
+            state: state.to_string(),
+        }
+    }
+
     /// Add a new node to the cluster (leader only)
     pub async fn add_node(&self, node_id: NodeId, addr: String) -> anyhow::Result<()> {
-        info!("Adding node {} at {}", node_id, addr);
-        let mut members = self.raft.members.write().await;
-        members.insert(node_id, BasicNode { addr });
+        info!("Adding node {} at {} to cluster", node_id, addr);
+
+        let node = BasicNode { addr: addr.clone() };
+        let change = ChangeMembers::AddNodes([(node_id, node)].into_iter().collect());
+
+        self.raft
+            .change_membership(change, false)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to add node: {}", e))?;
+
+        // Update cached members
+        let mut cached = self.cached_members.write().await;
+        if !cached.iter().any(|m| m.id == node_id) {
+            cached.push(ClusterMember {
+                id: node_id,
+                addr,
+                admin_port: None,
+                tls: false,
+            });
+        }
+
         Ok(())
     }
 
     /// Remove a node from the cluster (leader only)
     pub async fn remove_node(&self, node_id: NodeId) -> anyhow::Result<()> {
-        info!("Removing node {}", node_id);
-        let mut members = self.raft.members.write().await;
-        members.remove(&node_id);
+        info!("Removing node {} from cluster", node_id);
+
+        let mut remove_set = BTreeSet::new();
+        remove_set.insert(node_id);
+
+        let change = ChangeMembers::RemoveNodes(remove_set);
+
+        self.raft
+            .change_membership(change, false)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove node: {}", e))?;
+
+        // Update cached members
+        let mut cached = self.cached_members.write().await;
+        cached.retain(|m| m.id != node_id);
+
         Ok(())
+    }
+
+    /// Apply a replicated changelog (called when receiving from Raft log, not external)
+    /// This is used for backward compatibility with the simple replication mode
+    #[allow(dead_code)]
+    pub fn apply_replicated(&self, _changelog: &ChangeLog) -> ClientResponse {
+        // In full Raft mode, changes are applied through the state machine
+        // This method exists for API compatibility but shouldn't be called directly
+        warn!("apply_replicated called directly - in Raft mode, use propose() instead");
+        ClientResponse {
+            success: false,
+            message: Some("Use propose() for Raft mode".to_string()),
+        }
     }
 }
 
-/// Cluster error types (public API for error handling)
+/// Cluster error types
 #[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ClusterError {

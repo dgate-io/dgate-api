@@ -20,7 +20,6 @@ use crate::resources::ChangeLog;
 use crate::storage::ProxyStore;
 
 /// State machine for applying Raft log entries
-#[derive(Default)]
 pub struct DGateStateMachine {
     /// The underlying storage
     store: Option<Arc<ProxyStore>>,
@@ -34,8 +33,33 @@ pub struct DGateStateMachine {
     snapshot_data: RwLock<SnapshotData>,
 }
 
+impl Default for DGateStateMachine {
+    fn default() -> Self {
+        Self {
+            store: None,
+            last_applied: RwLock::new(None),
+            last_membership: RwLock::new(StoredMembership::default()),
+            change_tx: None,
+            snapshot_data: RwLock::new(SnapshotData::default()),
+        }
+    }
+}
+
+impl Clone for DGateStateMachine {
+    fn clone(&self) -> Self {
+        Self {
+            store: self.store.clone(),
+            last_applied: RwLock::new(self.last_applied.read().clone()),
+            last_membership: RwLock::new(self.last_membership.read().clone()),
+            change_tx: self.change_tx.clone(),
+            snapshot_data: RwLock::new(self.snapshot_data.read().clone()),
+        }
+    }
+}
+
 impl DGateStateMachine {
     /// Create a new state machine
+    #[allow(dead_code)]
     pub fn new(store: Arc<ProxyStore>) -> Self {
         Self {
             store: Some(store),
@@ -77,8 +101,8 @@ impl DGateStateMachine {
 
         let result = match changelog.cmd {
             ChangeCommand::AddNamespace => {
-                let ns: Namespace = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let ns: Namespace =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_namespace(&ns).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -95,8 +119,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddRoute => {
-                let route: Route = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let route: Route =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_route(&route).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -113,8 +137,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddService => {
-                let service: Service = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let service: Service =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_service(&service).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -131,8 +155,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddModule => {
-                let module: Module = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let module: Module =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_module(&module).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -149,8 +173,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddDomain => {
-                let domain: Domain = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let domain: Domain =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_domain(&domain).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -167,8 +191,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddSecret => {
-                let secret: Secret = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let secret: Secret =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_secret(&secret).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -185,8 +209,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddCollection => {
-                let collection: Collection = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let collection: Collection =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store
                     .set_collection(&collection)
                     .map_err(|e| e.to_string())?;
@@ -205,8 +229,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::AddDocument => {
-                let document: Document = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let document: Document =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_document(&document).map_err(|e| e.to_string())?;
                 ClientResponse {
                     success: true,
@@ -214,8 +238,8 @@ impl DGateStateMachine {
                 }
             }
             ChangeCommand::DeleteDocument => {
-                let doc: Document = serde_json::from_value(changelog.item.clone())
-                    .map_err(|e| e.to_string())?;
+                let doc: Document =
+                    serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store
                     .delete_document(&changelog.namespace, &doc.collection, &changelog.name)
                     .map_err(|e| e.to_string())?;
@@ -316,7 +340,7 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
 
     async fn install_snapshot(
         &mut self,
-        meta: &SnapshotMeta<TypeConfig>,
+        meta: &SnapshotMeta<NodeId, BasicNode>,
         snapshot: Box<Cursor<Vec<u8>>>,
     ) -> Result<(), StorageError<NodeId>> {
         info!("Installing snapshot: {:?}", meta);
