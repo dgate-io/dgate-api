@@ -10,9 +10,10 @@
 //! - Collection: Document grouping
 //! - Document: KV data storage
 
+#![allow(dead_code)] // Public API items for future use
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use url::Url;
 
 /// Namespace is a way to organize resources in DGate

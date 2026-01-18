@@ -7,7 +7,6 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
 use http_body_util::Full;
 use hyper::body::Bytes;

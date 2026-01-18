@@ -5,10 +5,9 @@
 
 use axum::{
     body::Body,
-    extract::{Request, State},
-    http::{header, HeaderMap, Method, StatusCode, Uri},
+    extract::Request,
+    http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
-    Router,
 };
 use dashmap::DashMap;
 use hyper_util::client::legacy::Client;
@@ -21,10 +20,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
-use crate::config::{DGateConfig, ProxyConfig};
-use crate::modules::{ModuleContext, ModuleError, ModuleExecutor, RequestContext, ResponseContext};
+use crate::config::DGateConfig;
+use crate::modules::{ModuleExecutor, RequestContext, ResponseContext};
 use crate::resources::*;
-use crate::storage::{create_storage, ProxyStore, Storage};
+use crate::storage::{create_storage, ProxyStore};
 
 /// Compiled route pattern for matching
 #[derive(Debug, Clone)]
@@ -66,6 +65,7 @@ impl CompiledRoute {
 }
 
 /// Namespace router containing compiled routes
+#[allow(dead_code)] // namespace field reserved for future use
 struct NamespaceRouter {
     namespace: Namespace,
     routes: Vec<CompiledRoute>,
@@ -106,6 +106,7 @@ pub struct ProxyState {
     domains: RwLock<Vec<ResolvedDomain>>,
     ready: AtomicBool,
     change_hash: AtomicU64,
+    #[allow(dead_code)] // Reserved for low-level HTTP/2 operations
     http_client: Client<
         hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
         Body,
@@ -141,7 +142,7 @@ impl ProxyState {
             .build()
             .expect("Failed to create reqwest client");
 
-        let state = Arc::new(Self {
+        Arc::new(Self {
             config,
             store,
             module_executor: RwLock::new(ModuleExecutor::new()),
@@ -151,9 +152,7 @@ impl ProxyState {
             change_hash: AtomicU64::new(0),
             http_client: client,
             reqwest_client,
-        });
-
-        state
+        })
     }
 
     pub fn store(&self) -> &ProxyStore {
@@ -416,14 +415,14 @@ impl ProxyState {
         }
 
         // Ensure default namespace exists if not disabled
-        if !self.config.disable_default_namespace {
-            if self.store.get_namespace("default").ok().flatten().is_none() {
-                let default_ns = Namespace::default_namespace();
-                self.store
-                    .set_namespace(&default_ns)
-                    .map_err(|e| ProxyError::Storage(e.to_string()))?;
-                self.rebuild_router("default").ok();
-            }
+        if !self.config.disable_default_namespace
+            && self.store.get_namespace("default").ok().flatten().is_none()
+        {
+            let default_ns = Namespace::default_namespace();
+            self.store
+                .set_namespace(&default_ns)
+                .map_err(|e| ProxyError::Storage(e.to_string()))?;
+            self.rebuild_router("default").ok();
         }
 
         self.set_ready(true);
@@ -667,15 +666,11 @@ impl ProxyState {
             // If no service, use request handler
             if compiled_route.service.is_none() {
                 let result = module_ctx.execute_request_handler(&req_ctx);
-                let error_result =
-                    if result.is_err() {
-                        Some(module_ctx.execute_error_handler(
-                            &req_ctx,
-                            &result.as_ref().unwrap_err().to_string(),
-                        ))
-                    } else {
-                        None
-                    };
+                let error_result = if let Err(ref e) = result {
+                    Some(module_ctx.execute_error_handler(&req_ctx, &e.to_string()))
+                } else {
+                    None
+                };
                 Some((result, error_result))
             } else {
                 None
@@ -1099,7 +1094,7 @@ fn compile_path_pattern(pattern: &str) -> Result<Regex, regex::Error> {
             '{' => {
                 // Named parameter with braces
                 let mut name = String::new();
-                while let Some(nc) = chars.next() {
+                for nc in chars.by_ref() {
                     if nc == '}' {
                         break;
                     }

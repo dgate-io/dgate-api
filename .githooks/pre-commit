@@ -1,0 +1,43 @@
+#!/bin/sh
+# Pre-commit hook for dgate
+# Runs rustfmt and clippy before allowing commits
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "❌ cargo not found. Please install Rust."
+    exit 1
+fi
+
+# Get list of staged Rust files
+STAGED_RS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+
+if [ -z "$STAGED_RS_FILES" ]; then
+    echo "✅ No Rust files staged, skipping checks."
+    exit 0
+fi
+
+echo "📝 Checking formatting with rustfmt..."
+if ! cargo fmt -- --check; then
+    echo ""
+    echo "❌ Formatting issues found!"
+    echo "   Run 'cargo fmt' to fix them, then stage the changes."
+    exit 1
+fi
+echo "✅ Formatting OK"
+
+echo ""
+echo "📎 Running clippy..."
+if ! cargo clippy --all-targets --all-features -- -D warnings 2>&1; then
+    echo ""
+    echo "❌ Clippy found issues!"
+    echo "   Fix the warnings above before committing."
+    exit 1
+fi
+echo "✅ Clippy OK"
+
+echo ""
+echo "🎉 All pre-commit checks passed!"

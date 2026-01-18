@@ -10,12 +10,9 @@ mod proxy;
 mod resources;
 mod storage;
 
-use axum::{
-    body::Body, extract::Request, http::StatusCode, response::IntoResponse, routing::any, Router,
-};
+use axum::{extract::Request, routing::any, Router};
 use clap::Parser;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::trace::TraceLayer;
@@ -82,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     proxy_state.init_from_config().await?;
 
     // Start admin API if configured
-    let admin_handle = if let Some(ref admin_config) = config.admin {
+    let _admin_handle = if let Some(ref admin_config) = config.admin {
         let admin_addr = format!("{}:{}", admin_config.host, admin_config.port);
         let admin_state = AdminState {
             proxy: proxy_state.clone(),

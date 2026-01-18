@@ -4,6 +4,8 @@
 //! - Namespaces, Routes, Services, Modules
 //! - Domains, Secrets, Collections, Documents
 
+#![allow(dead_code)] // Public API items for future use
+
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},

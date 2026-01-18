@@ -7,9 +7,8 @@
 use clap::{Args, Parser, Subcommand};
 use colored::Colorize;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::io::{self, Write};
 use tabled::{Table, Tabled};
 
@@ -188,6 +187,7 @@ enum DocumentAction {
 }
 
 /// API response wrapper
+#[allow(dead_code)] // Reserved for future use
 #[derive(Debug, Deserialize)]
 struct ApiResponse<T> {
     success: bool,

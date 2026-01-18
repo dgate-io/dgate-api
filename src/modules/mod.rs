@@ -3,6 +3,8 @@
 //! This module provides the runtime for executing user-defined modules
 //! that can modify requests, responses, handle errors, and more.
 
+#![allow(dead_code)] // Public API items for future use
+
 use rquickjs::{Context, Runtime, Value};
 use std::collections::HashMap;
 

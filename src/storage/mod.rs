@@ -3,6 +3,8 @@
 //! Provides KV storage for resources and documents using redb for file-based
 //! persistence and a concurrent hashmap for in-memory storage.
 
+#![allow(dead_code)] // Public API items for future use
+
 use crate::resources::{
     ChangeLog, Collection, Document, Domain, Module, Namespace, Route, Secret, Service,
 };
@@ -57,10 +59,8 @@ impl MemoryStorage {
     fn get_table(
         &self,
         table: &str,
-    ) -> dashmap::mapref::one::RefMut<String, DashMap<String, Vec<u8>>> {
-        self.tables
-            .entry(table.to_string())
-            .or_insert_with(DashMap::new)
+    ) -> dashmap::mapref::one::RefMut<'_, String, DashMap<String, Vec<u8>>> {
+        self.tables.entry(table.to_string()).or_default()
     }
 }
 
@@ -540,11 +540,7 @@ pub fn create_storage(config: &crate::config::StorageConfig) -> Arc<dyn Storage>
     match config.storage_type {
         crate::config::StorageType::Memory => Arc::new(MemoryStorage::new()),
         crate::config::StorageType::File => {
-            let dir = config
-                .dir
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or(".dgate/data");
+            let dir = config.dir.as_deref().unwrap_or(".dgate/data");
             let path = format!("{}/dgate.redb", dir);
             Arc::new(FileStorage::new(&path).expect("Failed to create file storage"))
         }
