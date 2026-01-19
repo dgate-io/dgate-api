@@ -8,13 +8,16 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    libclang-dev \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy manifests first for better caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to build dependencies
+# Create dummy source files to build dependencies
 RUN mkdir -p src/bin && \
+    echo "" > src/lib.rs && \
     echo "fn main() {}" > src/main.rs && \
     echo "fn main() {}" > src/bin/dgate-cli.rs && \
     cargo build --release --bin dgate-server --bin dgate-cli && \
