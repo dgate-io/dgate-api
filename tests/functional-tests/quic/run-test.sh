@@ -157,8 +157,8 @@ echo ""
 echo "Current implementation supports:"
 echo "  ✓ HTTPS upstream with TLS 1.3"
 echo "  ✓ HTTP/2 multiplexing"
-echo "  ○ QUIC transport (not yet implemented)"
-echo "  ○ HTTP/3 (not yet implemented)"
+echo "  ✓ QUIC transport"
+echo "  ✓ HTTP/3"
 echo ""
 
 # Print summary

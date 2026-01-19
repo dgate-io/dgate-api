@@ -6,16 +6,17 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use openraft::storage::RaftStateMachine;
+use openraft::storage::RaftStateMachine as RaftStateMachineTrait;
 use openraft::{
-    BasicNode, Entry, EntryPayload, LogId, OptionalSend, RaftSnapshotBuilder, Snapshot,
-    SnapshotMeta, StorageError, StoredMembership,
+    BasicNode, Entry, EntryPayload, LogId, OptionalSend,
+    RaftSnapshotBuilder as RaftSnapshotBuilderTrait, Snapshot, SnapshotMeta, StorageError,
+    StoredMembership,
 };
 use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use super::{ClientResponse, NodeId, SnapshotData, TypeConfig};
+use super::{NodeId, RaftClientResponse, SnapshotData, TypeConfig};
 use crate::resources::ChangeLog;
 use crate::storage::ProxyStore;
 
@@ -84,19 +85,13 @@ impl DGateStateMachine {
         }
     }
 
-    /// Get the underlying store
-    #[allow(dead_code)]
-    pub fn store(&self) -> Option<&ProxyStore> {
-        self.store.as_ref().map(|s| s.as_ref())
-    }
-
     /// Apply a change log to storage
-    fn apply_changelog(&self, changelog: &ChangeLog) -> Result<ClientResponse, String> {
+    fn apply_changelog(&self, changelog: &ChangeLog) -> Result<RaftClientResponse, String> {
         use crate::resources::*;
 
         let store = match &self.store {
             Some(s) => s,
-            None => return Ok(ClientResponse::default()),
+            None => return Ok(RaftClientResponse::default()),
         };
 
         let result = match changelog.cmd {
@@ -104,7 +99,7 @@ impl DGateStateMachine {
                 let ns: Namespace =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_namespace(&ns).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Namespace '{}' created", ns.name)),
                 }
@@ -113,7 +108,7 @@ impl DGateStateMachine {
                 store
                     .delete_namespace(&changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Namespace '{}' deleted", changelog.name)),
                 }
@@ -122,7 +117,7 @@ impl DGateStateMachine {
                 let route: Route =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_route(&route).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Route '{}' created", route.name)),
                 }
@@ -131,7 +126,7 @@ impl DGateStateMachine {
                 store
                     .delete_route(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Route '{}' deleted", changelog.name)),
                 }
@@ -140,7 +135,7 @@ impl DGateStateMachine {
                 let service: Service =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_service(&service).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Service '{}' created", service.name)),
                 }
@@ -149,7 +144,7 @@ impl DGateStateMachine {
                 store
                     .delete_service(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Service '{}' deleted", changelog.name)),
                 }
@@ -158,7 +153,7 @@ impl DGateStateMachine {
                 let module: Module =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_module(&module).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Module '{}' created", module.name)),
                 }
@@ -167,7 +162,7 @@ impl DGateStateMachine {
                 store
                     .delete_module(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Module '{}' deleted", changelog.name)),
                 }
@@ -176,7 +171,7 @@ impl DGateStateMachine {
                 let domain: Domain =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_domain(&domain).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Domain '{}' created", domain.name)),
                 }
@@ -185,7 +180,7 @@ impl DGateStateMachine {
                 store
                     .delete_domain(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Domain '{}' deleted", changelog.name)),
                 }
@@ -194,7 +189,7 @@ impl DGateStateMachine {
                 let secret: Secret =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_secret(&secret).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Secret '{}' created", secret.name)),
                 }
@@ -203,7 +198,7 @@ impl DGateStateMachine {
                 store
                     .delete_secret(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Secret '{}' deleted", changelog.name)),
                 }
@@ -214,7 +209,7 @@ impl DGateStateMachine {
                 store
                     .set_collection(&collection)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Collection '{}' created", collection.name)),
                 }
@@ -223,7 +218,7 @@ impl DGateStateMachine {
                 store
                     .delete_collection(&changelog.namespace, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Collection '{}' deleted", changelog.name)),
                 }
@@ -232,7 +227,7 @@ impl DGateStateMachine {
                 let document: Document =
                     serde_json::from_value(changelog.item.clone()).map_err(|e| e.to_string())?;
                 store.set_document(&document).map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Document '{}' created", document.id)),
                 }
@@ -243,7 +238,7 @@ impl DGateStateMachine {
                 store
                     .delete_document(&changelog.namespace, &doc.collection, &changelog.name)
                     .map_err(|e| e.to_string())?;
-                ClientResponse {
+                RaftClientResponse {
                     success: true,
                     message: Some(format!("Document '{}' deleted", changelog.name)),
                 }
@@ -267,7 +262,7 @@ impl DGateStateMachine {
     }
 }
 
-impl RaftStateMachine<TypeConfig> for DGateStateMachine {
+impl RaftStateMachineTrait<TypeConfig> for DGateStateMachine {
     type SnapshotBuilder = DGateSnapshotBuilder;
 
     async fn applied_state(
@@ -279,7 +274,10 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
         Ok((last_applied, last_membership))
     }
 
-    async fn apply<I>(&mut self, entries: I) -> Result<Vec<ClientResponse>, StorageError<NodeId>>
+    async fn apply<I>(
+        &mut self,
+        entries: I,
+    ) -> Result<Vec<RaftClientResponse>, StorageError<NodeId>>
     where
         I: IntoIterator<Item = Entry<TypeConfig>> + OptionalSend,
     {
@@ -293,14 +291,14 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
 
             match entry.payload {
                 EntryPayload::Blank => {
-                    responses.push(ClientResponse::default());
+                    responses.push(RaftClientResponse::default());
                 }
                 EntryPayload::Normal(changelog) => {
                     let response = match self.apply_changelog(&changelog) {
                         Ok(resp) => resp,
                         Err(e) => {
                             error!("Failed to apply changelog: {}", e);
-                            ClientResponse {
+                            RaftClientResponse {
                                 success: false,
                                 message: Some(e),
                             }
@@ -312,7 +310,7 @@ impl RaftStateMachine<TypeConfig> for DGateStateMachine {
                     info!("Applying membership change: {:?}", membership);
                     *self.last_membership.write() =
                         StoredMembership::new(Some(entry.log_id), membership);
-                    responses.push(ClientResponse::default());
+                    responses.push(RaftClientResponse::default());
                 }
             }
         }
@@ -412,7 +410,7 @@ pub struct DGateSnapshotBuilder {
     last_membership: StoredMembership<NodeId, BasicNode>,
 }
 
-impl RaftSnapshotBuilder<TypeConfig> for DGateSnapshotBuilder {
+impl RaftSnapshotBuilderTrait<TypeConfig> for DGateSnapshotBuilder {
     async fn build_snapshot(&mut self) -> Result<Snapshot<TypeConfig>, StorageError<NodeId>> {
         let data = serde_json::to_vec(&self.snapshot_data).map_err(|e| {
             StorageError::from_io_error(

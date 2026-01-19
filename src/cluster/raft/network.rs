@@ -59,7 +59,6 @@ pub struct RaftNetwork {
 
 impl RaftNetwork {
     fn endpoint(&self, path: &str) -> String {
-        // The addr should point to the admin API (e.g., "127.0.0.1:9080")
         format!("http://{}/raft{}", self.addr, path)
     }
 }

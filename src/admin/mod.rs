@@ -182,6 +182,11 @@ pub fn create_router(state: AdminState) -> Router {
                 .route("/append", post(raft_append_entries))
                 .route("/snapshot", post(raft_install_snapshot)),
         )
+        // Tempo message endpoints for cluster communication
+        .nest(
+            "/tempo",
+            Router::new().route("/message", post(tempo_message)),
+        )
         .with_state(state)
 }
 
@@ -827,11 +832,16 @@ pub struct ClusterStatus {
     pub enabled: bool,
     pub mode: String,
     pub node_id: Option<u64>,
+    /// True if this node can accept writes (always true for Tempo, leader-only for Raft)
+    pub can_write: bool,
+    /// For backward compatibility with Raft mode
     pub is_leader: bool,
     pub leader_id: Option<u64>,
     pub term: Option<u64>,
     pub last_applied_log: Option<u64>,
     pub commit_index: Option<u64>,
+    /// Node state (leader/follower/active etc)
+    pub state: String,
 }
 
 /// Cluster member info
@@ -857,18 +867,26 @@ async fn cluster_status(
 
     if let Some(cluster) = cluster {
         let metrics = cluster.metrics().await;
-        let is_leader = cluster.is_leader().await;
+        let can_write = cluster.is_leader().await;
         let leader_id = cluster.leader_id().await;
+
+        let mode_str = match cluster.mode() {
+            ClusterMode::Simple => "simple",
+            ClusterMode::Raft => "raft",
+            ClusterMode::Tempo => "tempo",
+        };
 
         let status = ClusterStatus {
             enabled: true,
-            mode: "cluster".to_string(),
+            mode: mode_str.to_string(),
             node_id: Some(metrics.id),
-            is_leader,
+            can_write,
+            is_leader: can_write, // Backward compatibility
             leader_id,
             term: metrics.current_term,
             last_applied_log: metrics.last_applied,
             commit_index: metrics.committed,
+            state: metrics.state.clone(),
         };
 
         Ok(Json(ApiResponse::success(status)))
@@ -877,11 +895,13 @@ async fn cluster_status(
             enabled: false,
             mode: "standalone".to_string(),
             node_id: None,
+            can_write: true,
             is_leader: true, // Standalone is always the leader
             leader_id: None,
             term: None,
             last_applied_log: None,
             commit_index: None,
+            state: "standalone".to_string(),
         };
 
         Ok(Json(ApiResponse::success(status)))
@@ -1000,6 +1020,7 @@ async fn internal_replicate(
 // while AppendEntriesRequest/InstallSnapshotRequest use TypeConfig.
 
 use crate::cluster::{NodeId, TypeConfig};
+use crate::config::ClusterMode;
 
 /// Handle Raft vote requests from other nodes
 async fn raft_vote(
@@ -1011,8 +1032,11 @@ async fn raft_vote(
         .cluster()
         .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
 
-    let response = cluster
+    let raft = cluster
         .raft()
+        .ok_or_else(|| ApiError::bad_request("Not in Raft mode"))?;
+
+    let response = raft
         .vote(req)
         .await
         .map_err(|e| ApiError::internal(format!("Vote failed: {}", e)))?;
@@ -1030,8 +1054,11 @@ async fn raft_append_entries(
         .cluster()
         .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
 
-    let response = cluster
+    let raft = cluster
         .raft()
+        .ok_or_else(|| ApiError::bad_request("Not in Raft mode"))?;
+
+    let response = raft
         .append_entries(req)
         .await
         .map_err(|e| ApiError::internal(format!("Append entries failed: {}", e)))?;
@@ -1049,11 +1076,52 @@ async fn raft_install_snapshot(
         .cluster()
         .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
 
-    let response = cluster
+    let raft = cluster
         .raft()
+        .ok_or_else(|| ApiError::bad_request("Not in Raft mode"))?;
+
+    let response = raft
         .install_snapshot(req)
         .await
         .map_err(|e| ApiError::internal(format!("Install snapshot failed: {}", e)))?;
 
     Ok(Json(response))
+}
+
+// Tempo RPC handlers for cluster communication
+//
+// These handlers receive Tempo protocol messages from other cluster nodes
+
+/// Request body for incoming Tempo messages
+#[derive(Debug, serde::Deserialize)]
+pub struct TempoMessageRequest {
+    pub from: NodeId,
+    pub message: crate::cluster::tempo::TempoMessage,
+}
+
+/// Handle incoming Tempo protocol messages
+async fn tempo_message(
+    State(state): State<AdminState>,
+    Json(req): Json<TempoMessageRequest>,
+) -> Result<Json<ApiResponse<()>>, ApiError> {
+    let cluster = state
+        .proxy
+        .cluster()
+        .ok_or_else(|| ApiError::bad_request("Cluster mode is not enabled"))?;
+
+    // Get the Tempo instance (available in both Simple and Tempo modes)
+    let tempo = cluster
+        .tempo()
+        .ok_or_else(|| ApiError::bad_request("Not in Tempo/Simple mode"))?;
+
+    tracing::debug!(
+        "Received Tempo {:?} message from node {}",
+        req.message.msg_type,
+        req.from
+    );
+
+    // Forward to the Tempo network handler
+    tempo.handle_incoming_message(req.from, req.message);
+
+    Ok(Json(ApiResponse::success(())))
 }

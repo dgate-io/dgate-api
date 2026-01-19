@@ -73,16 +73,7 @@ async fn main() -> anyhow::Result<()> {
     // Create proxy state
     let proxy_state = ProxyState::new(config.clone());
 
-    // Initialize cluster mode if configured
-    proxy_state.init_cluster().await?;
-
-    // Restore from change logs
-    proxy_state.restore_from_changelogs().await?;
-
-    // Initialize from config resources
-    proxy_state.init_from_config().await?;
-
-    // Start admin API if configured
+    // Start admin API FIRST - needed for Raft RPC endpoints before cluster init
     let _admin_handle = if let Some(ref admin_config) = config.admin {
         let admin_addr = format!("{}:{}", admin_config.host, admin_config.port);
         let admin_state = AdminState {
@@ -106,6 +97,22 @@ async fn main() -> anyhow::Result<()> {
     } else {
         None
     };
+
+    // Give admin server a moment to start accepting connections
+    if config.cluster.as_ref().map_or(false, |c| c.enabled) {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    // Initialize cluster mode if configured
+    // This must happen AFTER admin server starts because other nodes
+    // will need to connect to our /raft/* endpoints for replication
+    proxy_state.init_cluster().await?;
+
+    // Restore from change logs
+    proxy_state.restore_from_changelogs().await?;
+
+    // Initialize from config resources
+    proxy_state.init_from_config().await?;
 
     // Start proxy server
     let proxy_addr = format!("{}:{}", config.proxy.host, config.proxy.port);

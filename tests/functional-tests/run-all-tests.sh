@@ -53,7 +53,8 @@ SUITES_TO_RUN=()
 if [[ $# -gt 0 ]]; then
     SUITES_TO_RUN=("$@")
 else
-    SUITES_TO_RUN=("modules" "http2" "websocket" "grpc" "quic" "simple-replication" "raft-consensus")
+    # Default: run all test suites
+    SUITES_TO_RUN=("modules" "http2" "websocket" "grpc" "quic" "cluster-simple" "cluster-raft" "cluster-tempo")
 fi
 
 # Run selected suites
@@ -74,15 +75,48 @@ for suite in "${SUITES_TO_RUN[@]}"; do
         quic|http3)
             run_suite "QUIC/HTTP3 Tests" "$SCRIPT_DIR/quic"
             ;;
-        simple-replication|simple)
-            run_suite "Simple HTTP Replication Tests" "$SCRIPT_DIR/simple-replication"
+        # Cluster tests - organized by mode
+        cluster-simple|simple-replication|simple)
+            run_suite "Cluster: Simple HTTP Replication Tests" "$SCRIPT_DIR/cluster/simple"
             ;;
-        raft-consensus|raft)
-            run_suite "Raft Consensus Tests" "$SCRIPT_DIR/raft-consensus"
+        cluster-raft|raft-consensus|raft)
+            run_suite "Cluster: Raft Consensus Tests" "$SCRIPT_DIR/cluster/raft"
+            ;;
+        cluster-tempo|tempo-consensus|tempo)
+            run_suite "Cluster: Tempo Multi-Master Consensus Tests" "$SCRIPT_DIR/cluster/tempo"
+            ;;
+        # Run all cluster tests
+        cluster|cluster-all)
+            run_suite "Cluster: Simple HTTP Replication Tests" "$SCRIPT_DIR/cluster/simple"
+            run_suite "Cluster: Raft Consensus Tests" "$SCRIPT_DIR/cluster/raft"
+            run_suite "Cluster: Tempo Multi-Master Consensus Tests" "$SCRIPT_DIR/cluster/tempo"
+            ;;
+        # Legacy aliases (for backwards compatibility)
+        simple-replication-legacy)
+            run_suite "Simple HTTP Replication Tests (Legacy)" "$SCRIPT_DIR/simple-replication"
+            ;;
+        raft-consensus-legacy)
+            run_suite "Raft Consensus Tests (Legacy)" "$SCRIPT_DIR/raft-consensus"
             ;;
         *)
             echo "Unknown test suite: $suite"
-            echo "Available: modules, http2, websocket, grpc, quic, simple-replication, raft-consensus"
+            echo ""
+            echo "Available test suites:"
+            echo "  Core:"
+            echo "    modules        - JavaScript/TypeScript module tests"
+            echo "    http2          - HTTP/2 protocol tests"
+            echo "    websocket      - WebSocket protocol tests"
+            echo "    grpc           - gRPC protocol tests"
+            echo "    quic           - QUIC/HTTP3 protocol tests"
+            echo ""
+            echo "  Cluster modes:"
+            echo "    cluster-simple - Simple HTTP replication (multi-master)"
+            echo "    cluster-raft   - Raft consensus (leader-based)"
+            echo "    cluster-tempo  - Tempo consensus (multi-master, quorum-based)"
+            echo "    cluster        - Run all cluster tests"
+            echo ""
+            echo "  Aliases:"
+            echo "    simple, raft, tempo - shortcuts for cluster tests"
             ;;
     esac
 done

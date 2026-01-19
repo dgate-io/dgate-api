@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
-use crate::cluster::{ClusterManager, DGateStateMachine};
+use crate::cluster::ClusterManager;
 use crate::config::DGateConfig;
 use crate::modules::{ModuleExecutor, RequestContext, ResponseContext};
 use crate::resources::*;
@@ -183,28 +183,25 @@ impl ProxyState {
         };
 
         info!(
-            "Initializing cluster mode with node_id={}",
-            cluster_config.node_id
+            "Initializing cluster mode with node_id={} (mode: {:?})",
+            cluster_config.node_id, cluster_config.mode
         );
 
         // Create channel for change notifications
         let (change_tx, change_rx) = mpsc::unbounded_channel();
         *self.change_rx.write() = Some(change_rx);
 
-        // Create state machine with our store
-        let state_machine = Arc::new(DGateStateMachine::with_change_notifier(
-            self.store.clone(),
-            change_tx,
-        ));
-
-        // Create cluster manager
-        let cluster_manager = ClusterManager::new(cluster_config.clone(), state_machine).await?;
+        // Create cluster manager with the store and change channel
+        let cluster_manager =
+            ClusterManager::new(cluster_config.clone(), self.store.clone(), change_tx).await?;
         let cluster_manager = Arc::new(cluster_manager);
 
-        // Initialize the cluster
-        cluster_manager.initialize().await?;
+        // Store the cluster manager BEFORE initializing
+        // This allows incoming Raft/Tempo RPC to be handled while joining
+        *self.cluster.write() = Some(cluster_manager.clone());
 
-        *self.cluster.write() = Some(cluster_manager);
+        // Initialize the cluster (may trigger join requests and receive replication)
+        cluster_manager.initialize().await?;
 
         // Start background task to process cluster changes
         let proxy_state = self.clone();

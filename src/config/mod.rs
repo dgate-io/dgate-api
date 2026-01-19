@@ -574,6 +574,13 @@ pub enum ClusterMode {
     /// Provides stronger consistency guarantees.
     /// Only the leader can accept writes.
     Raft,
+
+    /// Tempo consensus algorithm for multi-master replication
+    /// A leaderless protocol that provides better scalability than Raft
+    /// by allowing any node to accept writes. Uses timestamp-based ordering
+    /// and quorum-based coordination for consistency.
+    /// Reference: https://github.com/vitorenesduarte/fantoch
+    Tempo,
 }
 
 /// Cluster configuration for distributed mode
@@ -583,7 +590,7 @@ pub struct ClusterConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Cluster replication mode (simple or raft)
+    /// Cluster replication mode (simple, raft, or tempo)
     #[serde(default)]
     pub mode: ClusterMode,
 
@@ -606,6 +613,66 @@ pub struct ClusterConfig {
     /// Node discovery configuration
     #[serde(default)]
     pub discovery: Option<DiscoveryConfig>,
+
+    /// Tempo-specific configuration
+    #[serde(default)]
+    pub tempo: Option<TempoConfig>,
+}
+
+/// Tempo consensus algorithm configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TempoConfig {
+    /// Fast quorum size (f+1 for optimal fast path, where f is max failures)
+    /// If not set, calculated from cluster size
+    #[serde(default)]
+    pub fast_quorum_size: Option<usize>,
+
+    /// Write quorum size for slow path
+    /// If not set, calculated from cluster size
+    #[serde(default)]
+    pub write_quorum_size: Option<usize>,
+
+    /// Interval for clock bump periodic event (in milliseconds)
+    /// Helps synchronize clocks across nodes
+    #[serde(default = "default_clock_bump_interval")]
+    pub clock_bump_interval_ms: u64,
+
+    /// Interval for sending detached votes (in milliseconds)
+    #[serde(default = "default_detached_send_interval")]
+    pub detached_send_interval_ms: u64,
+
+    /// Interval for garbage collection (in milliseconds)
+    #[serde(default = "default_gc_interval")]
+    pub gc_interval_ms: u64,
+
+    /// Whether to skip fast ack optimization
+    #[serde(default)]
+    pub skip_fast_ack: bool,
+}
+
+fn default_clock_bump_interval() -> u64 {
+    50 // 50ms
+}
+
+fn default_detached_send_interval() -> u64 {
+    100 // 100ms
+}
+
+fn default_gc_interval() -> u64 {
+    1000 // 1 second
+}
+
+impl Default for TempoConfig {
+    fn default() -> Self {
+        Self {
+            fast_quorum_size: None,
+            write_quorum_size: None,
+            clock_bump_interval_ms: default_clock_bump_interval(),
+            detached_send_interval_ms: default_detached_send_interval(),
+            gc_interval_ms: default_gc_interval(),
+            skip_fast_ack: false,
+        }
+    }
 }
 
 fn default_node_id() -> u64 {
@@ -626,6 +693,7 @@ impl Default for ClusterConfig {
             bootstrap: false,
             initial_members: Vec::new(),
             discovery: None,
+            tempo: None,
         }
     }
 }

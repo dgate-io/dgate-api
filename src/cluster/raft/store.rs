@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::ops::RangeBounds;
+use std::sync::Arc;
 
 use openraft::storage::{LogFlushed, RaftLogReader, RaftLogStorage};
 use openraft::{Entry, LogId, LogState, OptionalSend, RaftLogId, StorageError, Vote};
@@ -15,9 +16,8 @@ use tracing::debug;
 
 use super::{NodeId, TypeConfig};
 
-/// In-memory log store for Raft
-#[derive(Default)]
-pub struct RaftLogStore {
+/// Shared log data between the main store and its readers
+struct LogData {
     /// Current vote
     vote: RwLock<Option<Vote<NodeId>>>,
     /// Log entries
@@ -26,10 +26,37 @@ pub struct RaftLogStore {
     last_purged: RwLock<Option<LogId<NodeId>>>,
 }
 
+impl Default for LogData {
+    fn default() -> Self {
+        Self {
+            vote: RwLock::new(None),
+            logs: RwLock::new(BTreeMap::new()),
+            last_purged: RwLock::new(None),
+        }
+    }
+}
+
+/// In-memory log store for Raft
+///
+/// Uses Arc to share log data between the main store and its readers,
+/// ensuring that readers always see the latest logs.
+#[derive(Clone)]
+pub struct RaftLogStore {
+    data: Arc<LogData>,
+}
+
+impl Default for RaftLogStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RaftLogStore {
     /// Create a new log store
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            data: Arc::new(LogData::default()),
+        }
     }
 }
 
@@ -38,7 +65,7 @@ impl RaftLogReader<TypeConfig> for RaftLogStore {
         &mut self,
         range: RB,
     ) -> Result<Vec<Entry<TypeConfig>>, StorageError<NodeId>> {
-        let logs = self.logs.read();
+        let logs = self.data.logs.read();
         let entries: Vec<_> = logs.range(range).map(|(_, v)| v.clone()).collect();
         Ok(entries)
     }
@@ -48,8 +75,8 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
     type LogReader = Self;
 
     async fn get_log_state(&mut self) -> Result<LogState<TypeConfig>, StorageError<NodeId>> {
-        let logs = self.logs.read();
-        let last_purged = *self.last_purged.read();
+        let logs = self.data.logs.read();
+        let last_purged = *self.data.last_purged.read();
 
         let last = logs.iter().next_back().map(|(_, v)| *v.get_log_id());
 
@@ -60,21 +87,19 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
     }
 
     async fn get_log_reader(&mut self) -> Self::LogReader {
-        Self {
-            vote: RwLock::new(*self.vote.read()),
-            logs: RwLock::new(self.logs.read().clone()),
-            last_purged: RwLock::new(*self.last_purged.read()),
-        }
+        // Return a clone that shares the same Arc<LogData>
+        // This ensures the reader always sees the latest logs
+        self.clone()
     }
 
     async fn save_vote(&mut self, vote: &Vote<NodeId>) -> Result<(), StorageError<NodeId>> {
         debug!("Saving vote: {:?}", vote);
-        *self.vote.write() = Some(*vote);
+        *self.data.vote.write() = Some(*vote);
         Ok(())
     }
 
     async fn read_vote(&mut self) -> Result<Option<Vote<NodeId>>, StorageError<NodeId>> {
-        Ok(*self.vote.read())
+        Ok(*self.data.vote.read())
     }
 
     async fn append<I>(
@@ -85,7 +110,7 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
     where
         I: IntoIterator<Item = Entry<TypeConfig>> + OptionalSend,
     {
-        let mut logs = self.logs.write();
+        let mut logs = self.data.logs.write();
         for entry in entries {
             debug!("Appending log entry: {:?}", entry.log_id);
             logs.insert(entry.log_id.index, entry);
@@ -96,14 +121,14 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
 
     async fn truncate(&mut self, log_id: LogId<NodeId>) -> Result<(), StorageError<NodeId>> {
         debug!("Truncating logs from: {:?}", log_id);
-        let mut logs = self.logs.write();
+        let mut logs = self.data.logs.write();
         logs.split_off(&log_id.index);
         Ok(())
     }
 
     async fn purge(&mut self, log_id: LogId<NodeId>) -> Result<(), StorageError<NodeId>> {
         debug!("Purging logs up to: {:?}", log_id);
-        let mut logs = self.logs.write();
+        let mut logs = self.data.logs.write();
 
         // Remove all entries up to and including log_id
         let keys_to_remove: Vec<_> = logs.range(..=log_id.index).map(|(k, _)| *k).collect();
@@ -112,7 +137,7 @@ impl RaftLogStorage<TypeConfig> for RaftLogStore {
             logs.remove(&key);
         }
 
-        *self.last_purged.write() = Some(log_id);
+        *self.data.last_purged.write() = Some(log_id);
         Ok(())
     }
 }

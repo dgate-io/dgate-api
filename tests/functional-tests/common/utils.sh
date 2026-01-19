@@ -162,6 +162,32 @@ assert_status() {
     fi
 }
 
+# Run a test case with timeout
+# Usage: run_with_timeout <timeout_seconds> <test_name> <command...>
+run_with_timeout() {
+    local timeout_secs=$1
+    local test_name=$2
+    shift 2
+    
+    # Run the command in background and wait with timeout
+    local result
+    result=$( timeout "$timeout_secs" bash -c "$*" 2>&1 )
+    local exit_code=$?
+    
+    if [[ $exit_code -eq 124 ]]; then
+        error "Test '$test_name' timed out after ${timeout_secs}s"
+        TESTS_TOTAL=$((TESTS_TOTAL + 1))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        return 1
+    fi
+    
+    echo "$result"
+    return $exit_code
+}
+
+# Default test timeout in seconds
+TEST_TIMEOUT=${TEST_TIMEOUT:-30}
+
 # Print test summary
 print_summary() {
     echo ""

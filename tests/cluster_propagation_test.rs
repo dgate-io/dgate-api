@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 
 // Import from the dgate crate
-use dgate::cluster::{ClusterManager, DGateStateMachine};
+use dgate::cluster::ClusterManager;
 use dgate::config::{ClusterConfig, ClusterMember, ClusterMode, StorageConfig, StorageType};
 use dgate::resources::{
     ChangeCommand, ChangeLog, Collection, CollectionVisibility, Document, Domain, Module,
@@ -43,6 +43,7 @@ fn create_test_cluster_config(node_id: u64) -> ClusterConfig {
             tls: false,
         }],
         discovery: None,
+        tempo: None,
     }
 }
 
@@ -52,10 +53,9 @@ async fn test_namespace_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -103,10 +103,9 @@ async fn test_route_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -174,10 +173,9 @@ async fn test_service_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -242,10 +240,9 @@ async fn test_module_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -306,10 +303,9 @@ async fn test_domain_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -369,10 +365,9 @@ async fn test_secret_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -431,10 +426,9 @@ async fn test_collection_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -491,10 +485,9 @@ async fn test_document_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -571,10 +564,9 @@ async fn test_delete_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -630,10 +622,9 @@ async fn test_multiple_resource_propagation() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster
@@ -727,10 +718,9 @@ async fn test_changelog_data_integrity() {
     let store = create_test_storage();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let state_machine = Arc::new(DGateStateMachine::with_change_notifier(store.clone(), tx));
     let config = create_test_cluster_config(1);
 
-    let cluster = ClusterManager::new(config, state_machine)
+    let cluster = ClusterManager::new(config, store.clone(), tx)
         .await
         .expect("Failed to create cluster manager");
     cluster

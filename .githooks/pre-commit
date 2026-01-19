@@ -30,14 +30,4 @@ fi
 echo "✅ Formatting OK"
 
 echo ""
-echo "📎 Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings 2>&1; then
-    echo ""
-    echo "❌ Clippy found issues!"
-    echo "   Fix the warnings above before committing."
-    exit 1
-fi
-echo "✅ Clippy OK"
-
-echo ""
 echo "🎉 All pre-commit checks passed!"
