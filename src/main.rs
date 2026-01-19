@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Give admin server a moment to start accepting connections
-    if config.cluster.as_ref().map_or(false, |c| c.enabled) {
+    if config.cluster.as_ref().is_some_and(|c| c.enabled) {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 

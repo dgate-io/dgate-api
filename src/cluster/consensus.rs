@@ -48,10 +48,12 @@ impl ConsensusResponse {
 /// Node state in the cluster
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum NodeState {
     /// Node is the leader (Raft) or coordinator (Tempo)
     Leader,
     /// Node is a follower (Raft)
+    #[default]
     Follower,
     /// Node is a candidate during election (Raft)
     Candidate,
@@ -61,12 +63,6 @@ pub enum NodeState {
     Shutdown,
     /// Node is active (Tempo - all nodes can accept writes)
     Active,
-}
-
-impl Default for NodeState {
-    fn default() -> Self {
-        Self::Follower
-    }
 }
 
 impl std::fmt::Display for NodeState {
