@@ -1,0 +1,190 @@
+version: v1
+log_level: debug
+
+storage:
+  type: memory
+
+proxy:
+  port: ${DGATE_PORT:-8080}
+  host: 0.0.0.0
+  
+  init_resources:
+    namespaces:
+      - name: "test"
+    
+    collections:
+      - name: "test_docs"
+        namespace: "test"
+        visibility: private
+    
+    modules:
+      # JavaScript modules loaded from files
+      - name: "echo-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "echo_handler.js"
+      
+      - name: "status-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "status_handler.js"
+      
+      - name: "path-params-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "path_params_handler.js"
+      
+      - name: "redirect-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "redirect_handler.js"
+      
+      - name: "base64-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "base64_handler.js"
+      
+      - name: "document-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "document_handler.js"
+      
+      - name: "request-modifier"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "request_modifier.js"
+      
+      - name: "response-modifier"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "response_modifier.js"
+      
+      - name: "error-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "error_handler.js"
+      
+      - name: "hash-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "hash_handler.js"
+      
+      - name: "write-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadFile: "write_handler.js"
+      
+      # TypeScript module
+      - name: "typescript-handler"
+        namespace: "test"
+        moduleType: typescript
+        payloadFile: "typescript_handler.ts"
+      
+      # Inline JavaScript module
+      - name: "inline-handler"
+        namespace: "test"
+        moduleType: javascript
+        payloadRaw: |
+          function requestHandler(ctx) {
+            ctx.json({
+              type: "inline",
+              message: "Hello from inline module!",
+              method: ctx.request.method
+            });
+          }
+    
+    services:
+      # Echo backend for testing request/response modifiers
+      - name: "echo-backend"
+        namespace: "test"
+        urls:
+          - "http://127.0.0.1:${TEST_SERVER_PORT:-19999}"
+    
+    routes:
+      # Echo route - basic request handler
+      - name: "echo-route"
+        namespace: "test"
+        paths: ["/echo"]
+        methods: ["GET", "POST"]
+        modules: ["echo-handler"]
+      
+      # Status route - test status codes
+      - name: "status-route"
+        namespace: "test"
+        paths: ["/status"]
+        methods: ["GET"]
+        modules: ["status-handler"]
+      
+      # Path params route
+      - name: "path-params-route"
+        namespace: "test"
+        paths: ["/users/{user_id}/actions/{action}"]
+        methods: ["GET"]
+        modules: ["path-params-handler"]
+      
+      # Redirect route
+      - name: "redirect-route"
+        namespace: "test"
+        paths: ["/redirect"]
+        methods: ["GET"]
+        modules: ["redirect-handler"]
+      
+      # Base64 route
+      - name: "base64-route"
+        namespace: "test"
+        paths: ["/base64"]
+        methods: ["GET"]
+        modules: ["base64-handler"]
+      
+      # Document route
+      - name: "document-route"
+        namespace: "test"
+        paths: ["/documents"]
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        modules: ["document-handler"]
+      
+      # Hash route
+      - name: "hash-route"
+        namespace: "test"
+        paths: ["/hash"]
+        methods: ["GET"]
+        modules: ["hash-handler"]
+      
+      # Write route - raw response building
+      - name: "write-route"
+        namespace: "test"
+        paths: ["/write"]
+        methods: ["GET"]
+        modules: ["write-handler"]
+      
+      # Inline module route
+      - name: "inline-route"
+        namespace: "test"
+        paths: ["/inline"]
+        methods: ["GET"]
+        modules: ["inline-handler"]
+      
+      # TypeScript route
+      - name: "typescript-route"
+        namespace: "test"
+        paths: ["/typescript"]
+        methods: ["GET"]
+        modules: ["typescript-handler"]
+      
+      # Request modifier test - uses request modifier + echo backend
+      - name: "modifier-route"
+        namespace: "test"
+        paths: ["/modifier/**"]
+        methods: ["GET"]
+        service: "echo-backend"
+        modules: ["request-modifier", "response-modifier"]
+        strip_path: true
+    
+    domains:
+      - name: "default-domain"
+        namespace: "test"
+        patterns: ["*"]
+
+admin:
+  port: ${DGATE_ADMIN_PORT:-9080}
+  host: 0.0.0.0

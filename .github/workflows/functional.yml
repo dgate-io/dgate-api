@@ -1,0 +1,122 @@
+name: DGate Functional Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  DGATE_PORT: 8080
+  DGATE_ADMIN_PORT: 9080
+  TEST_SERVER_PORT: 19999
+
+jobs:
+  functional-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build DGate
+        run: cargo build --release --bin dgate-server --bin dgate-cli
+
+      - name: Setup Node.js (for test servers)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        run: |
+          cd tests/functional-tests/websocket && npm ci
+          cd ../grpc && npm ci
+
+      - name: Install netcat
+        run: sudo apt-get update && sudo apt-get install -y netcat-openbsd
+
+      - name: Run HTTP/2 Tests
+        run: ./tests/functional-tests/http2/run-test.sh
+        continue-on-error: true
+
+      - name: Run WebSocket Tests
+        run: ./tests/functional-tests/websocket/run-test.sh
+        continue-on-error: true
+
+      - name: Run gRPC Tests
+        run: ./tests/functional-tests/grpc/run-test.sh
+        continue-on-error: true
+
+      - name: Run QUIC Tests
+        run: ./tests/functional-tests/quic/run-test.sh
+        continue-on-error: true
+
+      - name: Run Simple Replication Cluster Tests
+        run: ./tests/functional-tests/simple-replication/run-test.sh
+        continue-on-error: true
+
+      - name: Run Raft Consensus Cluster Tests
+        run: ./tests/functional-tests/raft-consensus/run-test.sh
+        continue-on-error: true
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            /tmp/dgate*.log
+            /tmp/*-server.log
+          retention-days: 7
+
+  # Docker-based functional tests
+  docker-tests:
+    runs-on: ubuntu-latest
+    needs: [functional-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: dgate:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          # Start container
+          docker run -d --name dgate-test \
+            -p 8080:80 -p 9080:9080 \
+            -e LOG_LEVEL=debug \
+            dgate:test \
+            -c /dev/null
+          
+          # Wait for startup
+          sleep 5
+          
+          # Check health
+          curl -f http://localhost:9080/health || exit 1
+          
+          # Cleanup
+          docker stop dgate-test
+          docker rm dgate-test

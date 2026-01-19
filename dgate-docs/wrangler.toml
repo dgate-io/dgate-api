@@ -1,0 +1,3 @@
+name = "dgate-docs" # This should match your project name in Cloudflare Pages
+pages_build_output_dir = "./build" # Docusaurus's default build output directory
+compatibility_date = "2025-07-11" # Use the current date or later

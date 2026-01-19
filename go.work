@@ -1,7 +1,0 @@
-go 1.22.0
-
-use (
-	./
-	./functional-tests/grpc_tests
-	./functional-tests/ws_tests
-)

@@ -1,6 +1,7 @@
-*__debug_bin*
-.dgate
-cov.out
-go.work.sum
-.env
-coverage.txt
+target/
+
+.dgate/
+.lego/
+.vscode/
+
+node_modules

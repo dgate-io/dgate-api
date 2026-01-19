@@ -1,0 +1,115 @@
+---
+id: domains
+title: Domains
+---
+
+Domains control ingress traffic into specific namespaces in DGate. They allow you to route requests based on the host header to different namespaces.
+
+## Domain Structure
+
+```json
+{
+    "name": "domain1",
+    "namespace": "namespace1",
+    "patterns": ["*.example.com", "api.example.com"],
+    "priority": 10,
+    "cert": "BASE64_ENCODED_CERT",
+    "key": "BASE64_ENCODED_KEY",
+    "tags": ["tag1", "tag2"]
+}
+```
+
+## Domain Fields
+
+### `name!`
+
+The name of the domain.
+
+### `namespace!`
+
+The namespace that the domain belongs to. All requests matching this domain's patterns will be routed to routes in this namespace.
+
+### `patterns!`
+
+Patterns that the domain should match. Read more about [domain patterns](/docs/concepts/domain_patterns).
+
+Examples:
+- `example.com` - exact match
+- `*.example.com` - matches any subdomain
+- `api.*` - matches any domain starting with `api.`
+
+### `priority`
+
+The priority of the domain. Domains with higher priority values will be matched first. Default is `0`.
+
+This is useful when you have overlapping patterns:
+```yaml
+domains:
+  - name: "specific"
+    patterns: ["api.example.com"]
+    priority: 10  # Higher priority, checked first
+  - name: "wildcard"
+    patterns: ["*.example.com"]
+    priority: 1   # Lower priority, fallback
+```
+
+### `cert`
+
+The TLS certificate to use for the domain (base64 encoded PEM format).
+
+### `key`
+
+The private key to use for the domain (base64 encoded PEM format).
+
+### `tags`
+
+The tags associated with the domain. Read more about tags [here](/docs/concepts/tags).
+
+## Configuration File Options
+
+When defining domains in the configuration file, you can use file references for certificates:
+
+```yaml
+domains:
+  - name: "secure-domain"
+    namespace: "default"
+    patterns: ["secure.example.com"]
+    priority: 10
+    cert_file: "certs/domain.crt"
+    key_file: "certs/domain.key"
+```
+
+## Examples
+
+### Create a Domain via Admin API
+
+```bash
+curl -X PUT http://localhost:9080/api/v1/domain/default/my-domain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patterns": ["*.myapp.com", "myapp.local"],
+    "priority": 10
+  }'
+```
+
+### List Domains
+
+```bash
+curl http://localhost:9080/api/v1/domain
+```
+
+### Delete a Domain
+
+```bash
+curl -X DELETE http://localhost:9080/api/v1/domain/default/my-domain
+```
+
+## How Domain Matching Works
+
+1. When a request arrives, DGate checks the `Host` header
+2. Domains are sorted by priority (highest first)
+3. Each domain's patterns are checked in order
+4. The first matching domain determines the namespace for routing
+5. Routes within that namespace are then matched against the request path
+
+If no domain matches, the request is routed to the `default` namespace (if it exists).

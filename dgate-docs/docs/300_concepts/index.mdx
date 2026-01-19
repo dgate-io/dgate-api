@@ -1,0 +1,28 @@
+---
+title: Concepts
+---
+
+This section covers the core concepts and patterns used in DGate.
+
+## Key Concepts
+
+- **[Routing Patterns](/docs/concepts/routing_patterns)** - How DGate matches incoming requests to routes
+- **[Domain Patterns](/docs/concepts/domain_patterns)** - How domain matching works for ingress traffic
+- **[Tags](/docs/concepts/tags)** - Metadata system for organizing resources
+
+## Request Flow
+
+When a request arrives at DGate:
+
+1. **Domain Matching**: The `Host` header is matched against domain patterns to determine the target namespace
+2. **Route Matching**: The request path and method are matched against routes in that namespace
+3. **Module Execution**: If modules are configured, they are executed in order
+4. **Service Proxying**: If a service is configured, the request is forwarded upstream
+
+```
+Request → Domain Match → Route Match → Modules → Service (optional) → Response
+```
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />

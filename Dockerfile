@@ -1,16 +1,61 @@
-FROM golang:1.22.2-alpine3.19 as builder
-WORKDIR /app
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
-COPY . ./
-RUN go build -o /usr/bin/dgate-server ./cmd/dgate-server
-RUN go build -o /usr/bin/dgate-cli ./cmd/dgate-cli
+# DGate API Gateway - Multi-stage Dockerfile
+# Build stage for Rust compilation
+FROM rust:1.92-bookworm AS builder
 
-FROM alpine:3.19 as runner
 WORKDIR /app
-COPY --from=builder /usr/bin/dgate-server /usr/bin/
-COPY --from=builder /usr/bin/dgate-cli /usr/bin/
-COPY --from=builder /app/config.dgate.yaml ./
-EXPOSE 80 443 9080 9443
-CMD [ "dgate-server" ]
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifests first for better caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create a dummy main.rs to build dependencies
+RUN mkdir -p src/bin && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "fn main() {}" > src/bin/dgate-cli.rs && \
+    cargo build --release --bin dgate-server --bin dgate-cli && \
+    rm -rf src
+
+# Copy actual source code
+COPY src/ src/
+
+# Build the actual binaries (touch to invalidate the dummy build cache)
+RUN touch src/main.rs src/bin/dgate-cli.rs && \
+    cargo build --release --bin dgate-server --bin dgate-cli
+
+# Runtime stage - minimal image
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -s /bin/false dgate
+
+WORKDIR /app
+
+# Copy binaries from builder
+COPY --from=builder /app/target/release/dgate-server /usr/local/bin/
+COPY --from=builder /app/target/release/dgate-cli /usr/local/bin/
+
+# Create data directory
+RUN mkdir -p /app/data && chown dgate:dgate /app/data
+
+# Switch to non-root user
+USER dgate
+
+# Expose ports (proxy, admin)
+EXPOSE 80 443 9080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD dgate-cli health || exit 1
+
+# Default command
+ENTRYPOINT ["dgate-server"]
+CMD ["-c", "/app/config.yaml"]

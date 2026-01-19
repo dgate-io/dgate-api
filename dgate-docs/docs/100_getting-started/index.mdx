@@ -1,0 +1,73 @@
+---
+title: Getting Started
+---
+
+Welcome to DGate v2! This section will help you get up and running quickly.
+
+## Quick Start
+
+### 1. Install DGate
+
+```bash
+# Using Cargo
+cargo install dgate
+
+# Or using Docker
+docker pull ghcr.io/dgate-io/dgate:latest
+```
+
+### 2. Create a Configuration File
+
+```yaml title="config.dgate.yaml"
+version: v1
+log_level: info
+
+storage:
+  type: file
+  dir: .dgate/data/
+
+proxy:
+  port: 80
+  host: 0.0.0.0
+
+admin:
+  port: 9080
+  host: 0.0.0.0
+```
+
+### 3. Run the Server
+
+```bash
+dgate-server -c config.dgate.yaml
+```
+
+### 4. Create Your First Route
+
+```bash
+# Create a namespace
+curl -X PUT http://localhost:9080/api/v1/namespace/myapp
+
+# Create a service
+curl -X PUT http://localhost:9080/api/v1/service/myapp/backend \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://httpbin.org"]}'
+
+# Create a route
+curl -X PUT http://localhost:9080/api/v1/route/myapp/api \
+  -H "Content-Type: application/json" \
+  -d '{
+    "paths": ["/api/**"],
+    "methods": ["*"],
+    "service": "backend",
+    "strip_path": true
+  }'
+
+# Test it!
+curl http://localhost:80/api/get
+```
+
+## Next Steps
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />

@@ -1,0 +1,96 @@
+---
+id: faq
+title: FAQ
+---
+
+### How can I contribute to DGate?
+
+- Creating issues or pull requests on the [DGate repository](https://github.com/dgate-io/dgate)
+
+### Is DGate compatible with Node.js or any other JS runtimes?
+
+No, DGate uses the [QuickJS](https://bellard.org/quickjs/) JavaScript engine via the [rquickjs](https://github.com/DelSkaorth/rquickjs) Rust bindings. This means:
+
+- **No Node.js APIs**: Built-in Node.js modules like `fs`, `http`, `crypto`, etc. are not available.
+- **No npm packages**: You cannot use npm packages that depend on Node.js APIs.
+- **ES5/ES6 compatible**: Standard JavaScript (ES5/ES6) works well.
+- **Synchronous execution**: QuickJS runs JavaScript synchronously within the request lifecycle.
+
+DGate provides its own context API for interacting with requests, responses, and document storage.
+
+### What JavaScript features are available in DGate modules?
+
+DGate modules support:
+- Standard JavaScript (ES5/ES6)
+- JSON parsing/serialization (`JSON.parse`, `JSON.stringify`)
+- Base64 encoding/decoding (`btoa`, `atob`)
+- Console logging (`console.log`, `console.error`, etc.)
+- Context-provided functions for request handling and document storage
+
+### Why is DGate request latency high?
+
+DGate is a proxy server that sits between a client and the upstream service(s).
+The latency could be higher than expected due to the following reasons:
+
+- Network latency between the client and DGate
+- Network latency between DGate and the upstream service
+- DGate Transport Settings (which can limit the number of connections, etc.)
+- DGate Modules (having unoptimized or too many modules can increase latency)
+- Cold start of JavaScript runtime for the first request
+
+### What's new in DGate v2?
+
+DGate v2 is a complete rewrite in Rust, offering:
+
+| Feature | v1 (Go) | v2 (Rust) |
+|---------|---------|-----------|
+| Runtime | Go 1.21+ | Rust 1.75+ |
+| JS Engine | goja | QuickJS (rquickjs) |
+| HTTP | chi/stdlib | axum/hyper |
+| Storage | badger/file | redb/memory |
+| Documents | JSON Schema | Simple KV |
+| Consensus | hashicorp/raft | openraft |
+
+Key improvements:
+- Higher performance with Rust's async runtime (Tokio)
+- Simplified document storage (no schema required)
+- Better cluster support with openraft
+- New configuration options for modules (`payloadRaw`, `payloadFile`)
+
+### How do I migrate from DGate v1 to v2?
+
+1. **Configuration**: The configuration format is largely compatible. Main changes:
+   - Service timeouts now use `_ms` suffix (e.g., `request_timeout_ms`)
+   - Module payloads can use `payloadRaw` or `payloadFile` for easier configuration
+   - Collection schemas are no longer required
+
+2. **Modules**: Most modules should work with minimal changes:
+   - Replace `ctx.request()` with `ctx.request`
+   - Replace `ctx.response()` methods with direct context methods (`ctx.json()`, `ctx.setStatus()`, etc.)
+   - Document operations use `ctx.getDocument()`, `ctx.setDocument()`, `ctx.deleteDocument()`
+
+3. **Storage**: Migrate data from badger to redb format (export/import via Admin API)
+
+### Can DGate run in cluster mode?
+
+Yes! DGate v2 supports two cluster modes:
+
+1. **Simple mode**: HTTP-based replication where all nodes can accept writes
+2. **Raft mode**: Full consensus with leader election for stronger consistency
+
+See the [cluster configuration](/docs/getting-started/dgate-server#cluster-config) for details.
+
+### What storage backends are available?
+
+DGate v2 supports:
+
+- **Memory**: In-memory storage (data is lost on restart)
+- **File**: Persistent storage using [redb](https://github.com/cberner/redb)
+
+Configure in your config file:
+
+```yaml
+storage:
+  type: file  # or "memory"
+  dir: .dgate/data/
+```

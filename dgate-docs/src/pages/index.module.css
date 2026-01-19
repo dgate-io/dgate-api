@@ -1,0 +1,108 @@
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  height: 120vh;
+  width: 100vw;
+  overflow: hidden;
+  top: calc(50% - 10vh);
+  left: 0;
+  position: absolute;
+  background-color: transparent;
+}
+
+.heroBanner a:hover {
+  text-decoration: none;
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 2rem;
+  }
+}
+
+@media screen and (min-width: 996px) {
+  .heroBanner {
+    padding: 2rem;
+  }
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes jumbo {
+  from {
+    background-position: 50% 50%, 50% 50%;
+  }
+
+  to {
+    background-position: 350% 50%, 350% 50%;
+  }
+}
+
+.jumbo {
+  --stripes: repeating-linear-gradient(100deg,
+      #fff 0%,
+      #fff 7%,
+      transparent 10%,
+      transparent 12%,
+      #fff 16%);
+  --stripesDark: repeating-linear-gradient(100deg,
+      #000000bb 0%,
+      #000000bb 7%,
+      transparent 10%,
+      transparent 12%,
+      #000000bb 16%);
+  --rainbow: repeating-linear-gradient(100deg,
+      #fa6060 10%,
+      #f97979 15%,
+      #fa6060 5%,
+      #ea5e5e 25%,
+      #fa6060 30%);
+  --rainbowDark: repeating-linear-gradient(100deg,
+      #fe0909 10%,
+      #f91a1a 15%,
+      #f72929 5%,
+      #e72e2e 25%,
+      #c02121 30%);
+  background-image: var(--stripes), var(--rainbow);
+  background-size: 500vw, 300vh;
+  background-position: 50% 50%, 50% 50%;
+  filter: blur(5px) invert(100%);
+  /* mask-image: radial-gradient(
+    ellipse at 100% 0%,
+    black 40%,
+    transparent 70%); */
+  /* pointer-events: none; */
+  position: relative;
+}
+
+.jumbo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--stripes), var(--rainbow);
+  background-size: 200%, 100%;
+  animation: jumbo 60s linear infinite;
+  background-attachment: fixed;
+  mix-blend-mode: difference;
+}
+
+html[data-theme='dark'] .jumbo {
+  background-image: var(--stripesDark), var(--rainbowDark);
+  filter: blur(7px);
+}
+
+html[data-theme='dark'] .jumbo::after {
+  background-image: var(--stripesDark), var(--rainbowDark);
+}
+
+.jumboImg {
+  filter:blur(5px);
+  display: block;
+  margin: auto;
+  user-select: none;
+  transform: translate(0px, calc(50vh - 660px / 2));
+}

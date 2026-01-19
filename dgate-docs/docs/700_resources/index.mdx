@@ -1,0 +1,53 @@
+---
+title: Resources
+---
+
+DGate manages several types of resources that work together to route and process requests.
+
+## Resource Overview
+
+| Resource | Description |
+|----------|-------------|
+| [Namespaces](/docs/resources/namespaces) | Organizational units for grouping resources |
+| [Routes](/docs/resources/routes) | Define how incoming requests are matched and handled |
+| [Services](/docs/resources/services) | Define upstream endpoints for proxying requests |
+| [Modules](/docs/resources/modules) | JavaScript code for request/response processing |
+| [Domains](/docs/resources/domains) | Control ingress traffic routing by hostname |
+| [Collections](/docs/resources/collections) | Group documents together |
+| [Documents](/docs/resources/documents) | Key-value data storage |
+| [Secrets](/docs/resources/secrets) | Secure storage for sensitive data |
+
+## Resource Hierarchy
+
+```
+Namespace
+├── Routes ──────► Services
+│                      │
+├── Modules ◄──────────┘
+│
+├── Domains
+│
+├── Collections
+│   └── Documents
+│
+└── Secrets
+```
+
+## Admin API Endpoints
+
+All resources are managed through the Admin API:
+
+| Resource | List | Create/Update | Delete |
+|----------|------|---------------|--------|
+| Namespace | `GET /api/v1/namespace` | `PUT /api/v1/namespace/:name` | `DELETE /api/v1/namespace/:name` |
+| Route | `GET /api/v1/route` | `PUT /api/v1/route/:ns/:name` | `DELETE /api/v1/route/:ns/:name` |
+| Service | `GET /api/v1/service` | `PUT /api/v1/service/:ns/:name` | `DELETE /api/v1/service/:ns/:name` |
+| Module | `GET /api/v1/module` | `PUT /api/v1/module/:ns/:name` | `DELETE /api/v1/module/:ns/:name` |
+| Domain | `GET /api/v1/domain` | `PUT /api/v1/domain/:ns/:name` | `DELETE /api/v1/domain/:ns/:name` |
+| Collection | `GET /api/v1/collection` | `PUT /api/v1/collection/:ns/:name` | `DELETE /api/v1/collection/:ns/:name` |
+| Document | `GET /api/v1/document` | `PUT /api/v1/document/:ns/:col/:id` | `DELETE /api/v1/document/:ns/:col/:id` |
+| Secret | `GET /api/v1/secret` | `PUT /api/v1/secret/:ns/:name` | `DELETE /api/v1/secret/:ns/:name` |
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />

@@ -1,0 +1,45 @@
+{
+  "name": "dgate-docs",
+  "version": "0.0.0",
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^2.8.2",
+    "@docusaurus/core": "^3.2.1",
+    "@docusaurus/module-type-aliases": "^3.3.2",
+    "@docusaurus/plugin-google-gtag": "^3.2.1",
+    "@docusaurus/plugin-ideal-image": "^3.2.1",
+    "@docusaurus/plugin-sitemap": "^3.2.1",
+    "@docusaurus/preset-classic": "^3.2.1",
+    "@docusaurus/theme-mermaid": "^3.2.1",
+    "@docusaurus/tsconfig": "^3.3.2",
+    "@docusaurus/types": "^3.3.2",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@fortawesome/fontawesome-svg-core": "^6.5.2",
+    "@fortawesome/free-brands-svg-icons": "^6.5.2",
+    "@fortawesome/free-solid-svg-icons": "^6.5.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@mdx-js/react": "^3.0.1",
+    "@svgr/webpack": "^8.1.0",
+    "@types/node": "^20.12.12",
+    "@vercel/analytics": "^1.2.2",
+    "caniuse-lite": "^1.0.30001727",
+    "clsx": "^2.1.1",
+    "framer-motion": "^6",
+    "mermaid": "^10.7.0",
+    "react": "^18.0.1",
+    "react-dom": "^18.0.1",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "@flydotio/dockerfile": "latest"
+  }
+}

@@ -1,0 +1,104 @@
+---
+id: collections
+title: Collections
+---
+
+Collections are a way to group Documents together. Each Document belongs to a Collection, and each Collection belongs to a Namespace.
+
+In DGate v2, Collections are simple containers for Documents without schema enforcement - they work as flexible key-value stores.
+
+## Collection Structure
+
+```json
+{
+    "name": "collection1",
+    "namespace": "namespace1",
+    "visibility": "private",
+    "tags": ["tag1", "tag2"]
+}
+```
+
+## Collection Fields
+
+### `name!`
+
+The name of the Collection.
+
+### `namespace!`
+
+The namespace that the Collection belongs to.
+
+### `visibility`
+
+The visibility of the Collection. Can be `public` or `private`. Default is `private`.
+
+- **`private`**: Collection is only accessible by modules in the same namespace.
+- **`public`**: Collection is accessible by modules from any namespace.
+
+### `tags`
+
+The tags associated with the Collection. Read more about tags [here](/docs/concepts/tags).
+
+## Examples
+
+### Create a Private Collection
+
+```yaml
+collections:
+  - name: "users"
+    namespace: "default"
+    visibility: private
+```
+
+### Create a Public Collection
+
+```yaml
+collections:
+  - name: "shared-config"
+    namespace: "default"
+    visibility: public
+```
+
+### API Examples
+
+```bash
+# Create a collection via Admin API
+curl -X PUT http://localhost:9080/api/v1/collection/default/users \
+  -H "Content-Type: application/json" \
+  -d '{"visibility": "private"}'
+
+# List collections
+curl http://localhost:9080/api/v1/collection
+
+# Get a specific collection
+curl http://localhost:9080/api/v1/collection/default/users
+
+# Delete a collection
+curl -X DELETE http://localhost:9080/api/v1/collection/default/users
+```
+
+## Accessing Collections from Modules
+
+Modules can interact with documents in collections using the context methods:
+
+```javascript
+function requestHandler(ctx) {
+    // Read a document
+    var doc = ctx.getDocument("users", "user-123");
+    
+    // Create/update a document
+    ctx.setDocument("users", "user-456", { 
+        name: "John Doe", 
+        email: "john@example.com" 
+    });
+    
+    // Delete a document
+    ctx.deleteDocument("users", "user-789");
+    
+    ctx.json({ success: true });
+}
+```
+
+Note: Modules can only access collections with matching visibility rules:
+- Private collections: Only accessible from modules in the same namespace
+- Public collections: Accessible from modules in any namespace

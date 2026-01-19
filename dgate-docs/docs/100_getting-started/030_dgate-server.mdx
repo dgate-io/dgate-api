@@ -1,0 +1,455 @@
+---
+id: dgate-server
+title: DGate Server
+description: dgate-server guide for installing, usage and examples.
+---
+
+DGate Server is a high-performance, open-source, and scalable proxy server written in Rust that sits between a client and the upstream service(s). It is designed to handle a large number of concurrent connections and can be used to load balance, secure, and optimize traffic between clients and services.
+
+## Installation
+
+### Using Cargo (crates.io)
+
+```bash
+cargo install dgate
+```
+
+```bash
+dgate-server --help
+```
+
+### Building from Source
+
+```bash
+git clone https://github.com/dgate-io/dgate.git
+cd dgate
+cargo build --release
+./target/release/dgate-server --help
+```
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/dgate-io/dgate:latest
+docker run -it --rm ghcr.io/dgate-io/dgate dgate-server --help
+```
+
+import GithubReleaseFetcher from '@site/src/components/GithubReleaseFetcher';
+
+
+<GithubReleaseFetcher>
+## Binary Releases (Linux, MacOS, Windows)
+</GithubReleaseFetcher>
+
+## Setting up DGate Server Config
+
+```yaml
+version: v1
+log_level: ${LOG_LEVEL:-info}
+log_json: false
+debug: true
+tags: ["test", "dgate-v2"]
+
+storage:
+  type: file
+  dir: .dgate/data/
+
+proxy:
+  port: ${PORT:-80}
+  host: 0.0.0.0
+  global_headers:
+    X-Powered-By: DGate-v2
+
+admin:
+  port: 9080
+  host: 0.0.0.0
+  allow_list:
+    - "127.0.0.1/8"
+    - "::1"
+```
+
+## Running the Server
+
+```bash
+# With default config (looks for config.dgate.yaml, dgate.yaml, or /etc/dgate/config.yaml)
+./dgate-server
+
+# With custom config
+./dgate-server -c /path/to/config.yaml
+```
+
+## DGate Configuration
+
+### Version
+- `version`
+- Type: `String`
+- Description: The version of the configuration file. Currently `"v1"`.
+
+### Log Level
+- `log_level`
+- Type: `"debug" | "info" | "warn" | "error"`
+- Description: The log level for the DGate server. Default is `"info"`.
+
+### Log JSON
+- `log_json`
+- Type: `bool`
+- Description: If `true`, the logs will be output in JSON format.
+
+### Debug
+- `debug`
+- Type: `bool`
+- Description: Enable debug mode for additional logging.
+
+### Tags
+- `tags`
+- Type: `Vec<String>`
+- Description: Tags associated with this server instance.
+
+### Disable Default Namespace
+- `disable_default_namespace`
+- Type: `bool`
+- Description: If `true`, the default namespace will not be created automatically.
+
+### Disable Metrics
+- `disable_metrics`
+- Type: `bool`
+- Description: If `true`, Prometheus metrics endpoint will be disabled.
+
+### Storage
+- `storage.type`
+  - Type: `"memory" | "file"`
+  - Description: Storage backend type. `"memory"` for in-memory storage (data lost on restart), `"file"` for persistent storage using redb.
+- `storage.dir`
+  - Type: `String` (optional)
+  - Description: Directory for file-based storage. Required when `type` is `"file"`.
+
+### Proxy Config
+- `proxy.host`
+  - Type: `String`
+  - Default: `"0.0.0.0"`
+- `proxy.port`
+  - Type: `u16`
+  - Default: `80`
+- `proxy.tls`
+  - Type: [TlsConfig](#TlsConfig)
+- `proxy.enable_h2c`
+  - Type: `bool`
+  - Description: Enable HTTP/2 cleartext protocol.
+- `proxy.enable_http2`
+  - Type: `bool`
+  - Description: Enable HTTP/2 with TLS.
+- `proxy.console_log_level`
+  - Type: `String`
+  - Default: `"info"`
+- `proxy.redirect_https`
+  - Type: `Vec<String>`
+  - Description: List of domains to redirect to HTTPS.
+- `proxy.allowed_domains`
+  - Type: `Vec<String>`
+  - Description: List of allowed domain patterns.
+- `proxy.global_headers`
+  - Type: `HashMap<String, String>`
+  - Description: Headers added to all proxy responses.
+- `proxy.strict_mode`
+  - Type: `bool`
+  - Description: Enable strict request validation.
+- `proxy.disable_x_forwarded_headers`
+  - Type: `bool`
+  - Description: Disable adding X-Forwarded-* headers.
+- `proxy.x_forwarded_for_depth`
+  - Type: `usize`
+  - Description: Depth to trust X-Forwarded-For headers.
+- `proxy.client_transport`
+  - Type: [TransportConfig](#TransportConfig)
+- `proxy.init_resources`
+  - Type: [InitResources](#InitResources)
+  - Description: Initial resources loaded at startup from config file.
+
+### Admin Config
+- `admin.host`
+  - Type: `String`
+  - Default: `"0.0.0.0"`
+- `admin.port`
+  - Type: `u16`
+  - Default: `9080`
+- `admin.allow_list`
+  - Type: `Vec<String>`
+  - Description: IP addresses/CIDR ranges allowed to access admin API.
+- `admin.x_forwarded_for_depth`
+  - Type: `usize`
+- `admin.watch_only`
+  - Type: `bool`
+  - Description: If `true`, admin API is read-only.
+- `admin.tls`
+  - Type: [TlsConfig](#TlsConfig)
+- `admin.auth_method`
+  - Type: `"none" | "basic" | "key"`
+- `admin.basic_auth`
+  - Type: [BasicAuthConfig](#BasicAuthConfig)
+- `admin.key_auth`
+  - Type: [KeyAuthConfig](#KeyAuthConfig)
+
+### Cluster Config
+- `cluster.enabled`
+  - Type: `bool`
+  - Description: Enable cluster mode.
+- `cluster.mode`
+  - Type: `"simple" | "raft"`
+  - Description: Cluster replication mode. `"simple"` uses HTTP replication, `"raft"` uses full Raft consensus.
+- `cluster.node_id`
+  - Type: `u64`
+  - Description: Unique node ID for this instance.
+- `cluster.advertise_addr`
+  - Type: `String`
+  - Description: Address this node advertises to other nodes.
+- `cluster.bootstrap`
+  - Type: `bool`
+  - Description: Bootstrap a new cluster (only for first node).
+- `cluster.initial_members`
+  - Type: `Vec<ClusterMember>`
+  - Description: Initial cluster members for joining existing cluster.
+- `cluster.discovery`
+  - Type: [DiscoveryConfig](#DiscoveryConfig)
+  - Description: Node discovery configuration.
+
+### Test Server Config
+- `test_server.host`
+  - Type: `String`
+- `test_server.port`
+  - Type: `u16`
+  - Default: `8888`
+- `test_server.enable_h2c`
+  - Type: `bool`
+- `test_server.enable_http2`
+  - Type: `bool`
+- `test_server.enable_env_vars`
+  - Type: `bool`
+- `test_server.global_headers`
+  - Type: `HashMap<String, String>`
+
+
+## Configuration Definitions
+
+### TlsConfig \{#TlsConfig}
+- `tls.port`
+  - Type: `u16`
+  - Default: `443`
+- `tls.cert_file`
+  - Type: `String` (optional)
+- `tls.key_file`
+  - Type: `String` (optional)
+- `tls.auto_generate`
+  - Type: `bool`
+  - Description: Auto-generate self-signed certificates.
+
+### TransportConfig \{#TransportConfig}
+- `client_transport.dns_server`
+  - Type: `String` (optional)
+- `client_transport.dns_timeout_ms`
+  - Type: `u64` (optional)
+- `client_transport.max_idle_conns`
+  - Type: `usize` (optional)
+- `client_transport.max_idle_conns_per_host`
+  - Type: `usize` (optional)
+- `client_transport.max_conns_per_host`
+  - Type: `usize` (optional)
+- `client_transport.idle_conn_timeout_ms`
+  - Type: `u64` (optional)
+- `client_transport.disable_compression`
+  - Type: `bool`
+- `client_transport.disable_keep_alives`
+  - Type: `bool`
+- `client_transport.disable_private_ips`
+  - Type: `bool`
+  - Description: Disable requests to private IP ranges.
+
+### BasicAuthConfig \{#BasicAuthConfig}
+- `basic_auth.users`
+  - Type: `Vec<UserCredentials>`
+
+### UserCredentials \{#UserCredentials}
+- `basic_auth.users[i].username`
+  - Type: `String`
+- `basic_auth.users[i].password`
+  - Type: `String`
+
+### KeyAuthConfig \{#KeyAuthConfig}
+- `key_auth.query_param_name`
+  - Type: `String` (optional)
+- `key_auth.header_name`
+  - Type: `String` (optional)
+- `key_auth.keys`
+  - Type: `Vec<String>`
+
+### ClusterMember \{#ClusterMember}
+- `initial_members[i].id`
+  - Type: `u64`
+- `initial_members[i].addr`
+  - Type: `String`
+- `initial_members[i].admin_port`
+  - Type: `u16` (optional)
+- `initial_members[i].tls`
+  - Type: `bool`
+
+### DiscoveryConfig \{#DiscoveryConfig}
+- `discovery.type`
+  - Type: `"static" | "dns"`
+- `discovery.dns_name`
+  - Type: `String` (optional)
+  - Description: DNS name to resolve for node discovery.
+- `discovery.dns_port`
+  - Type: `u16`
+  - Default: `9090`
+- `discovery.refresh_interval_secs`
+  - Type: `u64`
+  - Default: `30`
+
+### InitResources \{#InitResources}
+- `init_resources.skip_validation`
+  - Type: `bool`
+- `init_resources.namespaces`
+  - Type: `Vec<Namespace>`
+- `init_resources.services`
+  - Type: `Vec<Service>`
+- `init_resources.routes`
+  - Type: `Vec<Route>`
+- `init_resources.modules`
+  - Type: `Vec<ModuleSpec>`
+- `init_resources.domains`
+  - Type: `Vec<DomainSpec>`
+- `init_resources.collections`
+  - Type: `Vec<Collection>`
+- `init_resources.documents`
+  - Type: `Vec<Document>`
+- `init_resources.secrets`
+  - Type: `Vec<Secret>`
+
+### Namespace \{#Namespace}
+- `namespace.name`
+  - Type: `String`
+- `namespace.tags`
+  - Type: `Vec<String>`
+
+### Service \{#Service}
+- `service.name`
+  - Type: `String`
+- `service.namespace`
+  - Type: `String`
+- `service.urls`
+  - Type: `Vec<String>`
+- `service.retries`
+  - Type: `u32` (optional)
+- `service.retry_timeout_ms`
+  - Type: `u64` (optional)
+- `service.connect_timeout_ms`
+  - Type: `u64` (optional)
+- `service.request_timeout_ms`
+  - Type: `u64` (optional)
+- `service.tls_skip_verify`
+  - Type: `bool`
+- `service.http2_only`
+  - Type: `bool`
+- `service.hide_dgate_headers`
+  - Type: `bool`
+- `service.disable_query_params`
+  - Type: `bool`
+- `service.tags`
+  - Type: `Vec<String>`
+
+### Route \{#Route}
+- `route.name`
+  - Type: `String`
+- `route.namespace`
+  - Type: `String`
+- `route.paths`
+  - Type: `Vec<String>`
+- `route.methods`
+  - Type: `Vec<String>`
+- `route.strip_path`
+  - Type: `bool`
+- `route.preserve_host`
+  - Type: `bool`
+- `route.service`
+  - Type: `String` (optional)
+- `route.modules`
+  - Type: `Vec<String>`
+- `route.tags`
+  - Type: `Vec<String>`
+
+### ModuleSpec \{#ModuleSpec}
+- `module.name`
+  - Type: `String`
+- `module.namespace`
+  - Type: `String`
+- `module.payload`
+  - Type: `String`
+  - Description: Base64 encoded module code.
+- `module.payloadRaw`
+  - Type: `String`
+  - Description: Plain text module code (will be base64 encoded automatically).
+- `module.payloadFile`
+  - Type: `String`
+  - Description: Path to a file containing the module code (relative to config file).
+- `module.moduleType`
+  - Type: `"typescript" | "javascript"`
+- `module.tags`
+  - Type: `Vec<String>`
+
+### DomainSpec \{#DomainSpec}
+- `domain.name`
+  - Type: `String`
+- `domain.namespace`
+  - Type: `String`
+- `domain.patterns`
+  - Type: `Vec<String>`
+- `domain.priority`
+  - Type: `i32`
+- `domain.cert`
+  - Type: `String`
+- `domain.key`
+  - Type: `String`
+- `domain.cert_file`
+  - Type: `String` (optional)
+- `domain.key_file`
+  - Type: `String` (optional)
+- `domain.tags`
+  - Type: `Vec<String>`
+
+### Collection \{#Collection}
+- `collection.name`
+  - Type: `String`
+- `collection.namespace`
+  - Type: `String`
+- `collection.visibility`
+  - Type: `"public" | "private"`
+- `collection.tags`
+  - Type: `Vec<String>`
+
+### Document \{#Document}
+- `document.id`
+  - Type: `String`
+- `document.namespace`
+  - Type: `String`
+- `document.collection`
+  - Type: `String`
+- `document.data`
+  - Type: `serde_json::Value`
+
+### Secret \{#Secret}
+- `secret.name`
+  - Type: `String`
+- `secret.namespace`
+  - Type: `String`
+- `secret.data`
+  - Type: `String`
+- `secret.tags`
+  - Type: `Vec<String>`
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_LEVEL` | Logging level | `info` |
+| `PORT` | Proxy server port | `80` |
+| `PORT_SSL` | HTTPS port | `443` |
+| `DG_DISABLE_BANNER` | Disable startup banner | - |
